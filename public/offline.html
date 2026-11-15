@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1B365D" />
+    <title>Sin conexion - ConsejoScout</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #f8fafc;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+      }
+      .card {
+        width: 100%;
+        max-width: 440px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 9999px;
+        background-color: #fef3c7;
+        border: 1px solid #b45309;
+        color: #78350f;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+      .logo-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .logo-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background-color: #1b365d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 28px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      p {
+        margin: 0 0 16px;
+        font-size: 15px;
+        line-height: 22px;
+        color: #334155;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      button,
+      a.btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 16px;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      button.primary {
+        background-color: #1b365d;
+        color: #ffffff;
+      }
+      button.primary:hover {
+        background-color: #122643;
+      }
+      a.secondary {
+        background-color: #ffffff;
+        color: #1b365d;
+        border-color: #1b365d;
+      }
+      button:focus-visible,
+      a.btn:focus-visible {
+        outline: 2px solid #1b365d;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="logo-row">
+        <div class="logo-box" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <div>
+          <h1>ConsejoScout</h1>
+        </div>
+      </div>
+
+      <div class="badge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="2" y1="2" x2="22" y2="22" />
+          <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+          <path d="M2 8.82a15 15 0 0 1 4.17-2.65" />
+          <path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76" />
+          <path d="M16.85 11.25a10 10 0 0 1 2.22 1.68" />
+          <path d="M5 12.86a10 10 0 0 1 5.17-2.89" />
+          <line x1="12" y1="20" x2="12.01" y2="20" />
+        </svg>
+        <span>Sin conexion a internet</span>
+      </div>
+
+      <p>
+        No pudimos cargar esta pantalla desde la red. Si ya abriste ConsejoScout en este dispositivo, podes volver al inicio para consultar la normativa local, planificar salidas y redactar notas sin conexion.
+      </p>
+
+      <div class="actions">
+        <button id="retry-connection-btn" type="button" class="primary">
+          Reintentar conexion
+        </button>
+        <a href="/" class="btn secondary">Volver al Tablero offline</a>
+      </div>
+    </main>
+    <script src="/offline.js" defer></script>
+  </body>
+</html>

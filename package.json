@@ -1,0 +1,36 @@
+{
+  "name": "consejoscout",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PWA operativa y normativa para Jefes de Grupo de Scouts de Argentina (SAAC)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "generate-vapid": "node scripts/generate-vapid.js",
+    "ingest-saac": "node scripts/ingest-saac-docs.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "dompurify": "^3.2.4",
+    "idb": "^8.0.2",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "web-push": "^3.6.7",
+    "workbox-core": "^7.3.0",
+    "workbox-precaching": "^7.3.0",
+    "workbox-routing": "^7.3.0",
+    "workbox-strategies": "^7.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.9",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.9",
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^0.21.1",
+    "vitest": "^5.1.0"
+  }
+}
