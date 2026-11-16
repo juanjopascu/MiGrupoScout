@@ -9,6 +9,7 @@ import {
   acceptLocalInvitation,
   createLocalGroupTenant,
   createLocalInvitation,
+  deleteLocalGroupTenant,
   listLocalGroupTeam,
   listLocalInvitations,
   listLocalUserMemberships,
@@ -17,7 +18,12 @@ import {
   revokeLocalInvitation,
   updateLocalTeamMember
 } from './localAuthStore.js';
-import { LS_KEYS, readLocalPref, writeLocalPref } from './offlineDb.js';
+import {
+  LS_KEYS,
+  clearGroupOfflineData,
+  readLocalPref,
+  writeLocalPref
+} from './offlineDb.js';
 import { isSupabaseConfigured, supabase } from './supabaseClient.js';
 
 export function readPendingInviteCode() {
@@ -278,4 +284,43 @@ export async function revokeGroupInvitation(invitationId) {
     return { ok: false, error: error.message || 'No se pudo revocar la invitacion.' };
   }
   return { ok: true };
+}
+
+export async function deleteScoutGroupTenant({ groupId, confirmNumber }) {
+  if (!isValidUuid(groupId)) {
+    return { ok: false, error: 'Identificador de Grupo invalido.' };
+  }
+
+  const parsedNumber = Number.parseInt(String(confirmNumber ?? ''), 10);
+  if (!Number.isInteger(parsedNumber) || parsedNumber <= 0) {
+    return { ok: false, error: 'Ingresa el numero del Grupo para confirmar la eliminacion.' };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    const res = deleteLocalGroupTenant(groupId, parsedNumber);
+    if (res.ok) {
+      await clearGroupOfflineData(groupId);
+    }
+    return res;
+  }
+
+  const { data, error } = await supabase.rpc('delete_scout_group_tenant', {
+    p_group_id: groupId,
+    p_confirm_number: parsedNumber
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo eliminar el tenant del Grupo Scout.'
+    };
+  }
+
+  await clearGroupOfflineData(groupId);
+  return {
+    ok: true,
+    deletedGroupId: data?.group_id || groupId,
+    groupNumber: data?.group_number || parsedNumber,
+    groupName: data?.group_name || ''
+  };
 }

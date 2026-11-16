@@ -373,6 +373,12 @@ export default function App() {
     await bootstrap(nextGroupId);
   }
 
+  async function handleTenantDeleted() {
+    setSettingsModalOpen(false);
+    setTeamModalOpen(false);
+    await bootstrap();
+  }
+
   async function handleLogout() {
     await unsubscribeFromPush({ session });
     await signOutSupabase();
@@ -632,6 +638,7 @@ export default function App() {
         onOpenTeamManager={() => setTeamModalOpen(true)}
         onAuthChanged={handleAuthChanged}
         onTenantReady={handleTenantReady}
+        onTenantDeleted={handleTenantDeleted}
         onLogout={handleLogout}
         syncState={syncState}
         onManualSync={handleManualSync}

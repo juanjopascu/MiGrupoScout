@@ -26,6 +26,7 @@ import {
 import { isSupabaseConfigured } from '../services/supabaseClient.js';
 import { cleanUserText, formatDateAr } from '../utils/textSanitizer.js';
 import AuthTenantPanel from './AuthTenantPanel.jsx';
+import DeleteTenantCard from './DeleteTenantCard.jsx';
 import GroupBrandingFields from './GroupBrandingFields.jsx';
 
 export default function GroupSettingsModal({
@@ -43,6 +44,7 @@ export default function GroupSettingsModal({
   onOpenTeamManager,
   onAuthChanged,
   onTenantReady,
+  onTenantDeleted,
   onLogout,
   syncState,
   onManualSync,
@@ -476,6 +478,14 @@ export default function GroupSettingsModal({
                 </button>
               )}
             </form>
+          )}
+
+          {session && !isDemoMode && (
+            <DeleteTenantCard
+              memberships={memberships}
+              activeGroupId={activeGroupId}
+              onTenantDeleted={onTenantDeleted}
+            />
           )}
         </div>
       </div>

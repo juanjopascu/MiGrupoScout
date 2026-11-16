@@ -28,6 +28,7 @@ import {
   acceptLocalInvitation,
   createLocalGroupTenant,
   createLocalInvitation,
+  deleteLocalGroupTenant,
   getLocalSession,
   listLocalGroupTeam,
   listLocalUserMemberships,
@@ -303,5 +304,19 @@ describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () =>
     const validLogin = await signInLocalUser('educador1@gruposcout.org.ar', 'claveSegura456');
     expect(validLogin.error).toBeNull();
     expect(validLogin.session?.user?.email).toBe('educador1@gruposcout.org.ar');
+
+    // Educador no puede eliminar el tenant completo
+    const forbiddenDelete = deleteLocalGroupTenant(tenantRes.group.id, 412);
+    expect(forbiddenDelete.ok).toBe(false);
+
+    // El Jefe de Grupo si puede eliminarlo confirmando el numero exacto
+    await signInLocalUser('jefe412@gruposcout.org.ar', 'claveSegura123');
+    const wrongConfirm = deleteLocalGroupTenant(tenantRes.group.id, 999);
+    expect(wrongConfirm.ok).toBe(false);
+
+    const okDelete = deleteLocalGroupTenant(tenantRes.group.id, 412);
+    expect(okDelete.ok).toBe(true);
+    expect(listLocalGroupTeam(tenantRes.group.id)).toHaveLength(0);
+    expect(listLocalUserMemberships(signupJefe.session.user.id)).toHaveLength(0);
   });
 });

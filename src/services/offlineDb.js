@@ -569,6 +569,42 @@ export async function removeOutboxItem(localId) {
   await db.delete(STORE_OUTBOX, localId);
 }
 
+export async function clearGroupOfflineData(groupId) {
+  if (!groupId) {
+    return;
+  }
+  try {
+    const db = await getDb();
+    await Promise.all([
+      db.delete(STORE_KV_CACHE, cacheKey('scout_group', groupId)),
+      db.delete(STORE_KV_CACHE, cacheKey('group_members', groupId)),
+      db.delete(STORE_KV_CACHE, cacheKey('camp_checklists', groupId)),
+      db.delete(STORE_KV_CACHE, cacheKey('council_tasks', groupId))
+    ]);
+
+    const queue = await getOutboxQueue();
+    await Promise.all(
+      queue
+        .filter((item) => item?.payload?.group_id === groupId || item?.recordId === groupId)
+        .map((item) => db.delete(STORE_OUTBOX, item.localId))
+    );
+  } catch {
+    // Ignorar errores de IndexedDB en navegadores restringidos
+  }
+
+  if (readLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null) === groupId) {
+    writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
+  }
+
+  const cachedMemberships = readLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, null);
+  if (cachedMemberships && Array.isArray(cachedMemberships.items)) {
+    writeLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, {
+      ...cachedMemberships,
+      items: cachedMemberships.items.filter((m) => m.group_id !== groupId)
+    });
+  }
+}
+
 /**
  * Limpieza de seguridad al cerrar sesion: purga IndexedDB (kv_cache y outbox_queue)
  * y claves de sesion en localStorage para proteger nominas de menores en equipos compartidos.

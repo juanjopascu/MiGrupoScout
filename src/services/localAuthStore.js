@@ -534,3 +534,60 @@ export function revokeLocalInvitation(invitationId) {
   );
   return { ok: true };
 }
+
+export function deleteLocalGroupTenant(groupId, confirmNumber) {
+  const session = getLocalSession();
+  if (!session?.user?.id) {
+    return { ok: false, error: 'Autenticacion requerida para eliminar un Grupo.' };
+  }
+
+  const groups = readStoreJson(LOCAL_STORE_KEYS.GROUPS, []);
+  const target = groups.find((g) => g.id === groupId);
+  if (!target) {
+    return { ok: false, error: 'El Grupo Scout indicado no existe.' };
+  }
+
+  const memberships = readStoreJson(LOCAL_STORE_KEYS.MEMBERSHIPS, []);
+  const isJefe = memberships.some(
+    (m) =>
+      m.group_id === groupId &&
+      m.user_id === session.user.id &&
+      m.role === 'jefe_grupo' &&
+      m.is_active !== false
+  );
+
+  if (!isJefe) {
+    return {
+      ok: false,
+      error: 'Solo el Jefe de Grupo titular puede eliminar este tenant.'
+    };
+  }
+
+  if (Number(target.number) !== Number.parseInt(String(confirmNumber ?? ''), 10)) {
+    return {
+      ok: false,
+      error: 'El numero de Grupo ingresado no coincide con el tenant seleccionado.'
+    };
+  }
+
+  const invitations = readStoreJson(LOCAL_STORE_KEYS.INVITATIONS, []);
+  writeStoreJson(
+    LOCAL_STORE_KEYS.GROUPS,
+    groups.filter((g) => g.id !== groupId)
+  );
+  writeStoreJson(
+    LOCAL_STORE_KEYS.MEMBERSHIPS,
+    memberships.filter((m) => m.group_id !== groupId)
+  );
+  writeStoreJson(
+    LOCAL_STORE_KEYS.INVITATIONS,
+    invitations.filter((inv) => inv.group_id !== groupId)
+  );
+
+  return {
+    ok: true,
+    deletedGroupId: groupId,
+    groupNumber: target.number,
+    groupName: target.name
+  };
+}

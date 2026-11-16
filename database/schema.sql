@@ -705,6 +705,71 @@ $$;
 REVOKE ALL ON FUNCTION preview_group_invitation(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION preview_group_invitation(text) TO anon, authenticated;
 
+CREATE OR REPLACE FUNCTION delete_scout_group_tenant(
+  p_group_id uuid,
+  p_confirm_number integer
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_group scout_groups%ROWTYPE;
+  v_is_jefe boolean;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Autenticacion requerida para eliminar un Grupo Scout';
+  END IF;
+
+  IF p_group_id IS NULL THEN
+    RAISE EXCEPTION 'Identificador de Grupo invalido';
+  END IF;
+
+  SELECT * INTO v_group
+  FROM scout_groups
+  WHERE id = p_group_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El Grupo Scout indicado no existe o ya fue eliminado';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM group_memberships
+    WHERE group_id = p_group_id
+      AND user_id = v_user_id
+      AND role = 'jefe_grupo'
+      AND is_active = true
+  ) INTO v_is_jefe;
+
+  IF NOT v_is_jefe THEN
+    RAISE EXCEPTION 'Solo el Jefe de Grupo titular puede eliminar el tenant completo';
+  END IF;
+
+  IF p_confirm_number IS NULL OR v_group.number <> p_confirm_number THEN
+    RAISE EXCEPTION 'El numero de Grupo de confirmacion no coincide';
+  END IF;
+
+  PERFORM set_config('app.tenant_provisioning', 'true', true);
+
+  DELETE FROM scout_groups
+  WHERE id = p_group_id;
+
+  RETURN jsonb_build_object(
+    'deleted', true,
+    'group_id', p_group_id,
+    'group_number', v_group.number,
+    'group_name', v_group.name
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION delete_scout_group_tenant(uuid, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION delete_scout_group_tenant(uuid, integer) TO authenticated;
+
 CREATE OR REPLACE FUNCTION accept_group_invitation(
   p_invite_code text,
   p_display_name text DEFAULT NULL

@@ -65,6 +65,10 @@ export function canEditGroupBranding(role) {
   return role === 'jefe_grupo';
 }
 
+export function canDeleteTenant(role) {
+  return role === 'jefe_grupo';
+}
+
 export function canManageInvitations(role) {
   return role === 'jefe_grupo' || role === 'subjefe_grupo';
 }
