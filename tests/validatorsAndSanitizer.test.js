@@ -159,7 +159,7 @@ describe('validators - validateCouncilTaskInput', () => {
     const res = validateCouncilTaskInput({
       title: 'Revisar fichas medicas',
       description: 'Punto 1\nPunto 2',
-      assigned_role: 'secretario',
+      assigned_role: 'subjefe_grupo',
       due_date: '2026-06-20',
       status: 'en_progreso',
       meeting_date: '2026-06-01',

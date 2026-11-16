@@ -11,6 +11,7 @@ import {
   saveGroupProfile,
   setCachedCollection,
   updateOutboxItem,
+  upsertCachedBatch,
   upsertCachedRecord,
   writeLocalPref
 } from './offlineDb.js';
@@ -132,6 +133,65 @@ export async function saveEntityOfflineFirst({ table, groupId, record, isNewHint
   }
 
   return { record: savedRecord, list };
+}
+
+export async function batchSaveMembersOfflineFirst({ groupId, records = [] }) {
+  if (!Array.isArray(records) || records.length === 0) {
+    return {
+      insertedCount: 0,
+      list: await getCachedCollection('group_members', groupId)
+    };
+  }
+
+  const { records: savedRecords, list } = await upsertCachedBatch(
+    'group_members',
+    groupId,
+    records
+  );
+
+  const session = await getCurrentSession();
+  const isRemoteGroup = isSupabaseConfigured && session && groupId !== DEMO_GROUP_ID;
+
+  if (isRemoteGroup) {
+    const payloads = savedRecords.map((item) => toDbPayload('group_members', item));
+    if (typeof navigator !== 'undefined' && navigator.onLine && supabase) {
+      let failedChunks = false;
+      for (let i = 0; i < payloads.length; i += 100) {
+        const chunk = payloads.slice(i, i + 100);
+        const { error } = await supabase
+          .from('group_members')
+          .upsert(chunk, { onConflict: 'id' });
+        if (error) {
+          failedChunks = true;
+          for (const row of chunk) {
+            await enqueueOutboxMutation({
+              table: 'group_members',
+              operation: 'INSERT',
+              recordId: row.id,
+              payload: row
+            });
+          }
+        }
+      }
+      if (!failedChunks) {
+        const syncedAt = new Date().toISOString();
+        writeLocalPref(LS_KEYS.LAST_SYNC_AT, syncedAt);
+      }
+      await emitSyncState();
+    } else {
+      for (const row of payloads) {
+        await enqueueOutboxMutation({
+          table: 'group_members',
+          operation: 'INSERT',
+          recordId: row.id,
+          payload: row
+        });
+      }
+      await emitSyncState();
+    }
+  }
+
+  return { insertedCount: savedRecords.length, list };
 }
 
 export async function deleteEntityOfflineFirst({ table, groupId, recordId }) {
@@ -295,7 +355,13 @@ export async function pullRemoteSnapshot(groupId) {
   ]);
 
   if (groupRes.data) {
-    await saveGroupProfile(groupRes.data);
+    const existingProfile = await getGroupProfile(groupId);
+    await saveGroupProfile({
+      ...groupRes.data,
+      userRole: existingProfile?.userRole || null,
+      userBranch: existingProfile?.userBranch || 'jefatura',
+      userDisplayName: existingProfile?.userDisplayName || null
+    });
   }
   if (Array.isArray(membersRes.data)) {
     await setCachedCollection('group_members', groupId, membersRes.data);
@@ -331,7 +397,7 @@ export async function pullRemoteSnapshot(groupId) {
   };
 }
 
-export async function resolveUserActiveGroup(session) {
+export async function resolveUserActiveGroup(session, preferredGroupId = null) {
   if (!isSupabaseConfigured || !supabase || !session?.user?.id) {
     return null;
   }
@@ -339,27 +405,40 @@ export async function resolveUserActiveGroup(session) {
   try {
     const { data, error } = await supabase
       .from('group_memberships')
-      .select('group_id, role, scout_groups (*)')
+      .select('id, group_id, role, branch, display_name, scout_groups (*)')
       .eq('user_id', session.user.id)
       .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: true });
 
-    if (error || !data?.group_id) {
-      return null;
+    if (error || !Array.isArray(data) || data.length === 0) {
+      return {
+        groupId: null,
+        role: null,
+        branch: null,
+        group: null,
+        memberships: []
+      };
     }
 
-    if (data.scout_groups) {
+    const storedGroupId = preferredGroupId || readLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
+    const activeMembership =
+      data.find((m) => m.group_id === storedGroupId) || data[0];
+
+    if (activeMembership.scout_groups) {
       await saveGroupProfile({
-        ...data.scout_groups,
-        userRole: data.role
+        ...activeMembership.scout_groups,
+        userRole: activeMembership.role,
+        userBranch: activeMembership.branch || 'jefatura',
+        userDisplayName: activeMembership.display_name || null
       });
     }
-    writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, data.group_id);
+    writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, activeMembership.group_id);
     return {
-      groupId: data.group_id,
-      role: data.role,
-      group: data.scout_groups || null
+      groupId: activeMembership.group_id,
+      role: activeMembership.role,
+      branch: activeMembership.branch || 'jefatura',
+      group: activeMembership.scout_groups || null,
+      memberships: data
     };
   } catch {
     return null;

@@ -1,0 +1,253 @@
+import {
+  isValidInviteCode,
+  normalizeInviteCode,
+  validateGroupTenantInput,
+  validateInvitationInput
+} from '../domain/roles.js';
+import { isValidUuid } from '../domain/validators.js';
+import { LS_KEYS, readLocalPref, writeLocalPref } from './offlineDb.js';
+import { isSupabaseConfigured, supabase } from './supabaseClient.js';
+
+export function readPendingInviteCode() {
+  return normalizeInviteCode(readLocalPref(LS_KEYS.PENDING_INVITE_CODE, '') || '');
+}
+
+export function savePendingInviteCode(code) {
+  const normalized = normalizeInviteCode(code || '');
+  writeLocalPref(LS_KEYS.PENDING_INVITE_CODE, normalized || null);
+  return normalized;
+}
+
+export async function listUserGroupMemberships(userId) {
+  if (!isSupabaseConfigured || !supabase || !userId) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('group_memberships')
+    .select('id, group_id, role, branch, display_name, is_active, scout_groups (*)')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true });
+
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+
+  return data.filter((item) => item.group_id);
+}
+
+export async function createScoutGroupTenant(input) {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      ok: false,
+      error: 'Supabase no esta configurado en este entorno.'
+    };
+  }
+
+  const validation = validateGroupTenantInput(input);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0] || 'Datos del Grupo invalidos.';
+    return { ok: false, error: firstError, errors: validation.errors };
+  }
+
+  const { number, name, district, zone, org_model, display_name } = validation.sanitized;
+
+  const { data, error } = await supabase.rpc('create_scout_group_tenant', {
+    p_number: number,
+    p_name: name,
+    p_district: district,
+    p_zone: zone,
+    p_org_model: org_model,
+    p_display_name: display_name
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo crear el tenant del Grupo Scout.'
+    };
+  }
+
+  return {
+    ok: true,
+    group: data?.group || null,
+    role: data?.role || 'jefe_grupo',
+    branch: data?.branch || 'jefatura'
+  };
+}
+
+export async function previewGroupInvitation(rawCode) {
+  const code = normalizeInviteCode(rawCode);
+  if (!isValidInviteCode(code)) {
+    return { valid: false, error: 'El formato del codigo de invitacion no es valido.' };
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      valid: false,
+      error: 'Conecta Supabase para validar invitaciones remotas.'
+    };
+  }
+
+  const { data, error } = await supabase.rpc('preview_group_invitation', {
+    p_invite_code: code
+  });
+
+  if (error) {
+    return {
+      valid: false,
+      error: error.message || 'No se pudo consultar la invitacion.'
+    };
+  }
+
+  return data || { valid: false, error: 'Invitacion no encontrada.' };
+}
+
+export async function acceptGroupInvitation(rawCode, displayName = '') {
+  const code = normalizeInviteCode(rawCode);
+  if (!isValidInviteCode(code)) {
+    return { ok: false, error: 'Codigo de invitacion invalido.' };
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: false, error: 'Supabase no esta configurado.' };
+  }
+
+  const { data, error } = await supabase.rpc('accept_group_invitation', {
+    p_invite_code: code,
+    p_display_name: displayName?.trim() || null
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo aceptar la invitacion.'
+    };
+  }
+
+  savePendingInviteCode('');
+  return {
+    ok: true,
+    groupId: data?.group_id || null,
+    groupNumber: data?.group_number || null,
+    groupName: data?.group_name || '',
+    role: data?.role || 'educador',
+    branch: data?.branch || 'jefatura'
+  };
+}
+
+export async function listGroupTeamMembers(groupId) {
+  if (!isSupabaseConfigured || !supabase || !isValidUuid(groupId)) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('group_memberships')
+    .select('id, group_id, user_id, role, branch, display_name, member_email, is_active, created_at')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true });
+
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+  return data;
+}
+
+export async function updateTeamMemberRole({ membershipId, role, branch, isActive }) {
+  if (!isSupabaseConfigured || !supabase || !isValidUuid(membershipId)) {
+    return { ok: false, error: 'Parametros invalidos para actualizar rol.' };
+  }
+
+  const patch = {};
+  if (role) patch.role = role;
+  if (branch) patch.branch = branch;
+  if (typeof isActive === 'boolean') patch.is_active = isActive;
+
+  const { data, error } = await supabase
+    .from('group_memberships')
+    .update(patch)
+    .eq('id', membershipId)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo actualizar la membresia.' };
+  }
+  return { ok: true, data };
+}
+
+export async function removeTeamMember(membershipId) {
+  if (!isSupabaseConfigured || !supabase || !isValidUuid(membershipId)) {
+    return { ok: false, error: 'Identificador de membresia invalido.' };
+  }
+
+  const { error } = await supabase
+    .from('group_memberships')
+    .delete()
+    .eq('id', membershipId);
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo quitar al integrante del equipo.' };
+  }
+  return { ok: true };
+}
+
+export async function listGroupInvitations(groupId) {
+  if (!isSupabaseConfigured || !supabase || !isValidUuid(groupId)) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('group_invitations')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false });
+
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+  return data;
+}
+
+export async function createGroupInvitation(input, actorRole = 'jefe_grupo') {
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: false, error: 'Supabase no esta configurado.' };
+  }
+
+  const validation = validateInvitationInput(input, actorRole);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0] || 'Datos de invitacion invalidos.';
+    return { ok: false, error: firstError, errors: validation.errors };
+  }
+
+  const s = validation.sanitized;
+  const { data, error } = await supabase.rpc('create_group_invitation', {
+    p_group_id: s.groupId,
+    p_role: s.role,
+    p_branch: s.branch,
+    p_invited_email: s.invitedEmail,
+    p_invited_name: s.invitedName,
+    p_max_uses: s.maxUses,
+    p_expires_days: s.expiresDays
+  });
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo generar la invitacion.' };
+  }
+  return { ok: true, invitation: data };
+}
+
+export async function revokeGroupInvitation(invitationId) {
+  if (!isSupabaseConfigured || !supabase || !isValidUuid(invitationId)) {
+    return { ok: false, error: 'Identificador de invitacion invalido.' };
+  }
+
+  const { error } = await supabase
+    .from('group_invitations')
+    .update({ status: 'revocada' })
+    .eq('id', invitationId);
+
+  if (error) {
+    return { ok: false, error: error.message || 'No se pudo revocar la invitacion.' };
+  }
+  return { ok: true };
+}

@@ -4,16 +4,20 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import GroupSettingsModal from './components/GroupSettingsModal.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
 import PushNotificationManager from './components/PushNotificationManager.jsx';
+import TeamManagementModal from './components/TeamManagementModal.jsx';
+import { canDeleteRecords, normalizeInviteCode } from './domain/roles.js';
 import CampPlanner from './pages/CampPlanner.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DocGenerator from './pages/DocGenerator.jsx';
 import NormativaChat from './pages/NormativaChat.jsx';
 import {
   DEMO_GROUP_ID,
+  LS_KEYS,
   clearAllOfflineData,
   getCachedCollection,
   getGroupProfile,
-  seedDemoDataIfEmpty
+  seedDemoDataIfEmpty,
+  writeLocalPref
 } from './services/offlineDb.js';
 import { detectPushState, unsubscribeFromPush } from './services/pushClient.js';
 import {
@@ -23,6 +27,7 @@ import {
   supabase
 } from './services/supabaseClient.js';
 import {
+  batchSaveMembersOfflineFirst,
   deleteEntityOfflineFirst,
   initAutoSync,
   pullRemoteSnapshot,
@@ -32,6 +37,10 @@ import {
   subscribeSyncStatus,
   syncPendingMutations
 } from './services/syncEngine.js';
+import {
+  readPendingInviteCode,
+  savePendingInviteCode
+} from './services/tenantService.js';
 
 function resolveTabFromPath(pathname) {
   const path = (pathname || '/').toLowerCase();
@@ -57,6 +66,21 @@ export default function App() {
   );
   const [session, setSession] = useState(null);
   const [groupId, setGroupId] = useState(DEMO_GROUP_ID);
+  const [userRole, setUserRole] = useState('jefe_grupo');
+  const [memberships, setMemberships] = useState([]);
+  const [hasActiveGroup, setHasActiveGroup] = useState(true);
+  const [pendingInviteCode, setPendingInviteCode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlInvite = normalizeInviteCode(
+        new URLSearchParams(window.location.search).get('invite') || ''
+      );
+      if (urlInvite) {
+        savePendingInviteCode(urlInvite);
+        return urlInvite;
+      }
+    }
+    return readPendingInviteCode();
+  });
   const [groupProfile, setGroupProfile] = useState(null);
   const [members, setMembers] = useState([]);
   const [camps, setCamps] = useState([]);
@@ -66,6 +90,7 @@ export default function App() {
   const [pushState, setPushState] = useState('checking');
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
 
   const [selectedCampId, setSelectedCampId] = useState(null);
   const [preloadedDocCamp, setPreloadedDocCamp] = useState(null);
@@ -91,44 +116,70 @@ export default function App() {
     setTasks(cachedTasks);
   }, []);
 
-  const bootstrap = useCallback(async () => {
-    setIsLoadingData(true);
-    try {
-      initAutoSync();
-      const activeSession = await getCurrentSession();
-      setSession(activeSession);
+  const bootstrap = useCallback(
+    async (preferredGroupId = null) => {
+      setIsLoadingData(true);
+      try {
+        initAutoSync();
+        const activeSession = await getCurrentSession();
+        setSession(activeSession);
 
-      let targetGroupId = DEMO_GROUP_ID;
+        let targetGroupId = DEMO_GROUP_ID;
+        let nextRole = 'jefe_grupo';
+        let nextMemberships = [];
+        let activeRemote = false;
 
-      if (activeSession && isSupabaseConfigured) {
-        const resolved = await resolveUserActiveGroup(activeSession);
-        if (resolved?.groupId) {
-          targetGroupId = resolved.groupId;
+        if (activeSession && isSupabaseConfigured) {
+          const resolved = await resolveUserActiveGroup(activeSession, preferredGroupId);
+          nextMemberships = resolved?.memberships || [];
+          if (resolved?.groupId) {
+            targetGroupId = resolved.groupId;
+            nextRole = resolved.role || 'educador';
+            activeRemote = true;
+          } else {
+            await seedDemoDataIfEmpty(true);
+            setSettingsModalOpen(true);
+          }
+        } else {
+          await seedDemoDataIfEmpty(false);
         }
-      } else {
-        await seedDemoDataIfEmpty(false);
-      }
 
-      setGroupId(targetGroupId);
-      await loadGroupStateFromCache(targetGroupId);
+        setMemberships(nextMemberships);
+        setHasActiveGroup(!activeSession || !isSupabaseConfigured || activeRemote);
+        setUserRole(nextRole);
+        setGroupId(targetGroupId);
+        await loadGroupStateFromCache(targetGroupId);
 
-      if (activeSession && targetGroupId !== DEMO_GROUP_ID && navigator.onLine) {
-        await syncPendingMutations();
-        const remote = await pullRemoteSnapshot(targetGroupId);
-        if (remote) {
-          setGroupProfile(remote.groupProfile);
-          setMembers(remote.members);
-          setCamps(remote.camps);
-          setTasks(remote.tasks);
+        if (activeSession && targetGroupId !== DEMO_GROUP_ID && navigator.onLine) {
+          await syncPendingMutations();
+          const remote = await pullRemoteSnapshot(targetGroupId);
+          if (remote) {
+            setGroupProfile(remote.groupProfile);
+            setMembers(remote.members);
+            setCamps(remote.camps);
+            setTasks(remote.tasks);
+          }
         }
+      } finally {
+        setIsLoadingData(false);
       }
-    } finally {
-      setIsLoadingData(false);
-    }
-  }, [loadGroupStateFromCache]);
+    },
+    [loadGroupStateFromCache]
+  );
 
   useEffect(() => {
     void bootstrap();
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('invite')) {
+        setSettingsModalOpen(true);
+        params.delete('invite');
+        const nextQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+        window.history.replaceState(null, '', cleanUrl);
+      }
+    }
 
     const unsubSync = subscribeSyncStatus((nextSync) => {
       setSyncState(nextSync);
@@ -222,6 +273,14 @@ export default function App() {
     setMembers(list);
   }
 
+  async function handleBatchImportMembers(records) {
+    const { list } = await batchSaveMembersOfflineFirst({
+      groupId,
+      records
+    });
+    setMembers(list);
+  }
+
   async function handleDeleteMember(memberId) {
     const list = await deleteEntityOfflineFirst({
       table: 'group_members',
@@ -256,13 +315,35 @@ export default function App() {
     await bootstrap();
   }
 
+  async function handleTenantReady(newGroupId) {
+    setPendingInviteCode('');
+    savePendingInviteCode('');
+    if (newGroupId) {
+      writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, newGroupId);
+    }
+    setSettingsModalOpen(false);
+    await bootstrap(newGroupId || null);
+  }
+
+  async function handleSwitchGroup(nextGroupId) {
+    if (!nextGroupId) {
+      return;
+    }
+    writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, nextGroupId);
+    await bootstrap(nextGroupId);
+  }
+
   async function handleLogout() {
     await unsubscribeFromPush({ session });
     await signOutSupabase();
     await clearAllOfflineData();
     setSession(null);
+    setMemberships([]);
+    setUserRole('jefe_grupo');
+    setHasActiveGroup(true);
     setPushState('default');
     setSettingsModalOpen(false);
+    setTeamModalOpen(false);
     await bootstrap();
   }
 
@@ -284,15 +365,20 @@ export default function App() {
     setNeedRefresh(false);
   }
 
+  const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
+
   return (
     <ErrorBoundary>
       <AppShell
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
         groupProfile={groupProfile}
+        userRole={userRole}
+        isDemoMode={isDemoMode}
         isOnline={isOnline}
         pushState={pushState}
         onOpenPushManager={() => setPushModalOpen(true)}
+        onOpenTeamManager={() => setTeamModalOpen(true)}
         onOpenSettings={() => setSettingsModalOpen(true)}
         syncState={syncState}
         needRefresh={needRefresh}
@@ -314,11 +400,16 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <Dashboard
                 groupProfile={groupProfile}
+                userRole={userRole}
+                isDemoMode={isDemoMode}
+                hasActiveGroup={hasActiveGroup}
                 members={members}
                 camps={camps}
                 tasks={tasks}
                 pushState={pushState}
                 onOpenPushManager={() => setPushModalOpen(true)}
+                onOpenTeamManager={() => setTeamModalOpen(true)}
+                onOpenSettings={() => setSettingsModalOpen(true)}
                 onOpenCampPlanner={(campId) => {
                   setSelectedCampId(campId);
                   handleSelectTab('campamentos');
@@ -326,6 +417,7 @@ export default function App() {
                 onSaveTask={handleSaveTask}
                 onDeleteTask={handleDeleteTask}
                 onSaveMember={handleSaveMember}
+                onBatchImportMembers={handleBatchImportMembers}
                 onDeleteMember={handleDeleteMember}
               />
             )}
@@ -344,7 +436,9 @@ export default function App() {
                 selectedCampId={selectedCampId}
                 onSelectCampId={setSelectedCampId}
                 onSaveCamp={handleSaveCamp}
-                onDeleteCamp={handleDeleteCamp}
+                onDeleteCamp={
+                  isDemoMode || canDeleteRecords(userRole) ? handleDeleteCamp : undefined
+                }
                 pushState={pushState}
                 onOpenPushManager={() => setPushModalOpen(true)}
                 onOpenDocGeneratorWithCamp={(campData) => {
@@ -377,13 +471,31 @@ export default function App() {
         onPushStateChange={setPushState}
       />
 
+      <TeamManagementModal
+        isOpen={teamModalOpen}
+        onClose={() => setTeamModalOpen(false)}
+        groupId={groupId}
+        groupProfile={groupProfile}
+        userRole={userRole}
+        currentUserId={session?.user?.id || null}
+        isDemoMode={isDemoMode}
+      />
+
       <GroupSettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         groupProfile={groupProfile}
         onSaveGroupProfile={handleSaveGroupProfile}
         session={session}
+        userRole={userRole}
+        memberships={memberships}
+        activeGroupId={groupId}
+        hasActiveGroup={hasActiveGroup}
+        pendingInviteCode={pendingInviteCode}
+        onSwitchGroup={handleSwitchGroup}
+        onOpenTeamManager={() => setTeamModalOpen(true)}
         onAuthChanged={handleAuthChanged}
+        onTenantReady={handleTenantReady}
         onLogout={handleLogout}
         syncState={syncState}
         onManualSync={handleManualSync}

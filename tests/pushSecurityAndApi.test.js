@@ -542,4 +542,80 @@ describe('API integration - /api/push/check-reminders', () => {
     expect(call.payload.body).toContain('1 carpeta distrital proxima a fecha limite');
     expect(call.payload.body).toContain('1 tarea de Consejo por vencer');
   });
+
+  it('usa RPC agregada y despacha en lotes para multiples grupos (escala 50 tenants)', async () => {
+    const groupA = '550e8400-e29b-41d4-a716-446655440001';
+    const groupB = '550e8400-e29b-41d4-a716-446655440002';
+    const userA = '11111111-1111-4111-8111-111111111111';
+    const userB = '22222222-2222-4222-8222-222222222222';
+
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: [
+        { group_id: groupA, camps_count: 1, medical_count: 0, tasks_count: 2 },
+        { group_id: groupB, camps_count: 0, medical_count: 4, tasks_count: 0 }
+      ],
+      error: null
+    });
+
+    mockGetSupabaseAdmin.mockReturnValue({
+      rpc: rpcMock,
+      from: vi.fn((table) => {
+        if (table === 'scout_groups') {
+          return createQueryBuilder({
+            data: [
+              { id: groupA, number: 101 },
+              { id: groupB, number: 202 }
+            ],
+            error: null
+          });
+        }
+        if (table === 'group_memberships') {
+          return createQueryBuilder({
+            data: [
+              { group_id: groupA, user_id: userA },
+              { group_id: groupB, user_id: userB }
+            ],
+            error: null
+          });
+        }
+        if (table === 'push_subscriptions') {
+          return createQueryBuilder({
+            data: [
+              { id: 's1', group_id: groupA, user_id: userA, endpoint: 'https://push.example/a', p256dh: 'p1', auth: 'a1' },
+              { id: 's2', group_id: groupB, user_id: userB, endpoint: 'https://push.example/b', p256dh: 'p2', auth: 'a2' }
+            ],
+            error: null
+          });
+        }
+        return createQueryBuilder({ data: [], error: null });
+      })
+    });
+
+    mockDispatchPushNotifications.mockResolvedValue({
+      sent: 1,
+      failed: 0,
+      prunedExpired: 0
+    });
+
+    const req = {
+      method: 'GET',
+      headers: { authorization: 'Bearer super-secret-cron-token-2026' }
+    };
+    const res = createMockRes();
+
+    await checkRemindersHandler(req, res);
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'get_daily_reminder_group_stats',
+      expect.objectContaining({
+        p_camp_cutoff: expect.any(String),
+        p_medical_cutoff: expect.any(String),
+        p_task_cutoff: expect.any(String)
+      })
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.groupsEvaluated).toBe(2);
+    expect(res.body.data.notificationsSent).toBe(2);
+    expect(mockDispatchPushNotifications).toHaveBeenCalledTimes(2);
+  });
 });

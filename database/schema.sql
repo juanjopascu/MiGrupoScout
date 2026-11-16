@@ -30,16 +30,47 @@ CREATE TABLE IF NOT EXISTS group_memberships (
       'jefe_grupo',
       'subjefe_grupo',
       'jefe_rama',
-      'educador',
-      'secretario',
-      'tesorero',
-      'consejero'
+      'educador'
     )),
+  branch text NOT NULL DEFAULT 'jefatura'
+    CHECK (branch IN ('manada', 'unidad', 'caminantes', 'rovers', 'jefatura')),
+  display_name text,
+  member_email text,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (group_id, user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_group_memberships_group_active
+  ON group_memberships (group_id, is_active, role);
+
+CREATE INDEX IF NOT EXISTS idx_group_memberships_user_active
+  ON group_memberships (user_id, is_active);
+
+CREATE TABLE IF NOT EXISTS group_invitations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid NOT NULL REFERENCES scout_groups(id) ON DELETE CASCADE,
+  invite_code text NOT NULL UNIQUE,
+  invited_email text,
+  invited_name text,
+  role text NOT NULL
+    CHECK (role IN ('subjefe_grupo', 'jefe_rama', 'educador')),
+  branch text NOT NULL DEFAULT 'jefatura'
+    CHECK (branch IN ('manada', 'unidad', 'caminantes', 'rovers', 'jefatura')),
+  max_uses integer NOT NULL DEFAULT 1 CHECK (max_uses >= 1 AND max_uses <= 100),
+  uses_count integer NOT NULL DEFAULT 0 CHECK (uses_count >= 0),
+  status text NOT NULL DEFAULT 'pendiente'
+    CHECK (status IN ('pendiente', 'aceptada', 'revocada', 'expirada')),
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '14 days'),
+  created_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  accepted_by uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_invitations_group_status
+  ON group_invitations (group_id, status, expires_at);
 
 CREATE TABLE IF NOT EXISTS group_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,8 +158,6 @@ CREATE TABLE IF NOT EXISTS council_tasks (
       'subjefe_grupo',
       'jefe_rama',
       'educador',
-      'secretario',
-      'tesorero',
       'consejo_pleno'
     )),
   due_date date,
@@ -265,6 +294,75 @@ CREATE TRIGGER trg_group_memberships_updated_at
   BEFORE UPDATE ON group_memberships
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_group_invitations_updated_at ON group_invitations;
+CREATE TRIGGER trg_group_invitations_updated_at
+  BEFORE UPDATE ON group_invitations
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE OR REPLACE FUNCTION prevent_membership_privilege_escalation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_is_provisioning text := current_setting('app.tenant_provisioning', true);
+  v_actor_is_jefe boolean;
+BEGIN
+  IF current_user IN ('postgres', 'supabase_admin', 'service_role') OR v_is_provisioning = 'true' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.role = 'jefe_grupo' THEN
+      RAISE EXCEPTION 'No se puede eliminar al Jefe de Grupo titular por esta via';
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM group_memberships
+    WHERE group_id = NEW.group_id
+      AND user_id = auth.uid()
+      AND role = 'jefe_grupo'
+      AND is_active = true
+  ) INTO v_actor_is_jefe;
+
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.role = 'jefe_grupo' AND NOT v_actor_is_jefe THEN
+      RAISE EXCEPTION 'Solo el Jefe de Grupo puede asignar otro Jefe de Grupo';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    IF (OLD.role = 'jefe_grupo' OR NEW.role = 'jefe_grupo') AND NOT v_actor_is_jefe THEN
+      RAISE EXCEPTION 'Solo el Jefe de Grupo puede modificar cargos de Jefatura de Grupo';
+    END IF;
+    IF OLD.role = 'jefe_grupo' AND NEW.user_id = auth.uid() AND (NEW.role <> 'jefe_grupo' OR NEW.is_active = false) THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM group_memberships
+        WHERE group_id = NEW.group_id
+          AND user_id <> auth.uid()
+          AND role = 'jefe_grupo'
+          AND is_active = true
+      ) THEN
+        RAISE EXCEPTION 'El Grupo debe mantener al menos un Jefe de Grupo activo';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_group_memberships_guard ON group_memberships;
+CREATE TRIGGER trg_group_memberships_guard
+  BEFORE INSERT OR UPDATE OR DELETE ON group_memberships
+  FOR EACH ROW EXECUTE FUNCTION prevent_membership_privilege_escalation();
+
 DROP TRIGGER IF EXISTS trg_group_members_updated_at ON group_members;
 CREATE TRIGGER trg_group_members_updated_at
   BEFORE UPDATE ON group_members
@@ -331,6 +429,403 @@ GRANT EXECUTE ON FUNCTION is_group_member(uuid) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION has_group_role(uuid, text[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION has_group_role(uuid, text[]) TO authenticated, service_role;
 
+-- 4.1 RPCs multi-tenant para provisionamiento de Grupo e invitaciones
+
+CREATE OR REPLACE FUNCTION create_scout_group_tenant(
+  p_number integer,
+  p_name text,
+  p_district text,
+  p_zone text,
+  p_org_model text DEFAULT 'tradicional',
+  p_display_name text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_user_email text := lower(trim(COALESCE(auth.jwt() ->> 'email', '')));
+  v_clean_name text := trim(COALESCE(p_name, ''));
+  v_clean_district text := trim(COALESCE(p_district, ''));
+  v_clean_zone text := trim(COALESCE(p_zone, ''));
+  v_clean_model text := COALESCE(NULLIF(trim(p_org_model), ''), 'tradicional');
+  v_clean_display text := COALESCE(NULLIF(trim(p_display_name), ''), NULLIF(split_part(v_user_email, '@', 1), ''), 'Jefe de Grupo');
+  v_group scout_groups%ROWTYPE;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Autenticacion requerida para crear un Grupo Scout';
+  END IF;
+
+  IF p_number IS NULL OR p_number <= 0 THEN
+    RAISE EXCEPTION 'Numero de Grupo invalido';
+  END IF;
+
+  IF char_length(v_clean_name) < 3 OR char_length(v_clean_district) < 2 OR char_length(v_clean_zone) < 2 THEN
+    RAISE EXCEPTION 'Completa nombre oficial, distrito y zona del Grupo';
+  END IF;
+
+  IF v_clean_model NOT IN ('tradicional', 'nucleo', 'comunitario', 'escolar') THEN
+    RAISE EXCEPTION 'Modalidad organizativa invalida';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM scout_groups WHERE number = p_number) THEN
+    RAISE EXCEPTION 'Ya existe un Grupo Scout registrado con el numero %', p_number;
+  END IF;
+
+  PERFORM set_config('app.tenant_provisioning', 'true', true);
+
+  INSERT INTO scout_groups (number, name, district, zone, org_model)
+  VALUES (p_number, v_clean_name, v_clean_district, v_clean_zone, v_clean_model)
+  RETURNING * INTO v_group;
+
+  INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    branch,
+    display_name,
+    member_email,
+    is_active
+  )
+  VALUES (
+    v_group.id,
+    v_user_id,
+    'jefe_grupo',
+    'jefatura',
+    v_clean_display,
+    NULLIF(v_user_email, ''),
+    true
+  );
+
+  RETURN jsonb_build_object(
+    'group', to_jsonb(v_group),
+    'role', 'jefe_grupo',
+    'branch', 'jefatura'
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION create_scout_group_tenant(integer, text, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION create_scout_group_tenant(integer, text, text, text, text, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION create_group_invitation(
+  p_group_id uuid,
+  p_role text,
+  p_branch text DEFAULT 'jefatura',
+  p_invited_email text DEFAULT NULL,
+  p_invited_name text DEFAULT NULL,
+  p_max_uses integer DEFAULT 1,
+  p_expires_days integer DEFAULT 14
+)
+RETURNS group_invitations
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_actor_role text;
+  v_code text;
+  v_invitation group_invitations%ROWTYPE;
+  v_clean_email text := NULLIF(lower(trim(COALESCE(p_invited_email, ''))), '');
+  v_clean_name text := NULLIF(trim(COALESCE(p_invited_name, '')), '');
+  v_uses integer := LEAST(GREATEST(COALESCE(p_max_uses, 1), 1), 100);
+  v_days integer := LEAST(GREATEST(COALESCE(p_expires_days, 14), 1), 90);
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Autenticacion requerida';
+  END IF;
+
+  SELECT role INTO v_actor_role
+  FROM group_memberships
+  WHERE group_id = p_group_id
+    AND user_id = v_user_id
+    AND is_active = true
+  LIMIT 1;
+
+  IF v_actor_role IS NULL OR v_actor_role NOT IN ('jefe_grupo', 'subjefe_grupo') THEN
+    RAISE EXCEPTION 'Solo Jefatura de Grupo puede generar invitaciones';
+  END IF;
+
+  IF p_role NOT IN ('subjefe_grupo', 'jefe_rama', 'educador') THEN
+    RAISE EXCEPTION 'Rol de invitacion invalido';
+  END IF;
+
+  IF v_actor_role = 'subjefe_grupo' AND p_role = 'subjefe_grupo' THEN
+    RAISE EXCEPTION 'Solo el Jefe de Grupo puede invitar a un Subjefe de Grupo';
+  END IF;
+
+  IF p_branch NOT IN ('manada', 'unidad', 'caminantes', 'rovers', 'jefatura') THEN
+    RAISE EXCEPTION 'Rama invalida';
+  END IF;
+
+  v_code := 'CS-' || upper(encode(gen_random_bytes(5), 'hex'));
+
+  INSERT INTO group_invitations (
+    group_id,
+    invite_code,
+    invited_email,
+    invited_name,
+    role,
+    branch,
+    max_uses,
+    expires_at,
+    created_by
+  )
+  VALUES (
+    p_group_id,
+    v_code,
+    v_clean_email,
+    v_clean_name,
+    p_role,
+    p_branch,
+    v_uses,
+    now() + make_interval(days => v_days),
+    v_user_id
+  )
+  RETURNING * INTO v_invitation;
+
+  RETURN v_invitation;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION create_group_invitation(uuid, text, text, text, text, integer, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION create_group_invitation(uuid, text, text, text, text, integer, integer) TO authenticated;
+
+CREATE OR REPLACE FUNCTION preview_group_invitation(p_invite_code text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_code text := upper(trim(COALESCE(p_invite_code, '')));
+  v_inv group_invitations%ROWTYPE;
+  v_group scout_groups%ROWTYPE;
+BEGIN
+  IF v_code = '' THEN
+    RETURN jsonb_build_object('valid', false, 'error', 'Codigo vacio');
+  END IF;
+
+  SELECT * INTO v_inv
+  FROM group_invitations
+  WHERE invite_code = v_code
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('valid', false, 'error', 'Codigo de invitacion inexistente');
+  END IF;
+
+  IF v_inv.status <> 'pendiente' THEN
+    RETURN jsonb_build_object('valid', false, 'error', 'La invitacion ya fue utilizada o revocada');
+  END IF;
+
+  IF v_inv.expires_at <= now() THEN
+    RETURN jsonb_build_object('valid', false, 'error', 'La invitacion ha expirado');
+  END IF;
+
+  IF v_inv.uses_count >= v_inv.max_uses THEN
+    RETURN jsonb_build_object('valid', false, 'error', 'La invitacion alcanzo su limite de usos');
+  END IF;
+
+  SELECT * INTO v_group
+  FROM scout_groups
+  WHERE id = v_inv.group_id;
+
+  RETURN jsonb_build_object(
+    'valid', true,
+    'group_id', v_group.id,
+    'group_number', v_group.number,
+    'group_name', v_group.name,
+    'district', v_group.district,
+    'zone', v_group.zone,
+    'role', v_inv.role,
+    'branch', v_inv.branch,
+    'requires_email', (v_inv.invited_email IS NOT NULL),
+    'expires_at', v_inv.expires_at
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION preview_group_invitation(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION preview_group_invitation(text) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION accept_group_invitation(
+  p_invite_code text,
+  p_display_name text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_user_email text := lower(trim(COALESCE(auth.jwt() ->> 'email', '')));
+  v_code text := upper(trim(COALESCE(p_invite_code, '')));
+  v_inv group_invitations%ROWTYPE;
+  v_group scout_groups%ROWTYPE;
+  v_existing_role text;
+  v_final_role text;
+  v_clean_display text := COALESCE(NULLIF(trim(p_display_name), ''), NULLIF(split_part(v_user_email, '@', 1), ''), 'Educador');
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesion para aceptar una invitacion';
+  END IF;
+
+  SELECT * INTO v_inv
+  FROM group_invitations
+  WHERE invite_code = v_code
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Codigo de invitacion inexistente';
+  END IF;
+
+  IF v_inv.status <> 'pendiente' THEN
+    RAISE EXCEPTION 'La invitacion ya no se encuentra activa';
+  END IF;
+
+  IF v_inv.expires_at <= now() THEN
+    UPDATE group_invitations SET status = 'expirada' WHERE id = v_inv.id;
+    RAISE EXCEPTION 'La invitacion ha expirado';
+  END IF;
+
+  IF v_inv.uses_count >= v_inv.max_uses THEN
+    UPDATE group_invitations SET status = 'aceptada' WHERE id = v_inv.id;
+    RAISE EXCEPTION 'La invitacion alcanzo su limite de usos';
+  END IF;
+
+  IF v_inv.invited_email IS NOT NULL AND v_inv.invited_email <> v_user_email THEN
+    RAISE EXCEPTION 'Esta invitacion fue emitida para otro correo electronico';
+  END IF;
+
+  PERFORM set_config('app.tenant_provisioning', 'true', true);
+
+  SELECT role INTO v_existing_role
+  FROM group_memberships
+  WHERE group_id = v_inv.group_id
+    AND user_id = v_user_id;
+
+  IF v_existing_role = 'jefe_grupo' THEN
+    v_final_role := 'jefe_grupo';
+  ELSE
+    v_final_role := v_inv.role;
+  END IF;
+
+  INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    branch,
+    display_name,
+    member_email,
+    is_active
+  )
+  VALUES (
+    v_inv.group_id,
+    v_user_id,
+    v_final_role,
+    v_inv.branch,
+    v_clean_display,
+    NULLIF(v_user_email, ''),
+    true
+  )
+  ON CONFLICT (group_id, user_id) DO UPDATE SET
+    role = v_final_role,
+    branch = EXCLUDED.branch,
+    display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), group_memberships.display_name),
+    member_email = COALESCE(EXCLUDED.member_email, group_memberships.member_email),
+    is_active = true;
+
+  UPDATE group_invitations
+  SET
+    uses_count = uses_count + 1,
+    accepted_by = v_user_id,
+    status = CASE WHEN uses_count + 1 >= max_uses THEN 'aceptada' ELSE 'pendiente' END
+  WHERE id = v_inv.id;
+
+  SELECT * INTO v_group
+  FROM scout_groups
+  WHERE id = v_inv.group_id;
+
+  RETURN jsonb_build_object(
+    'group_id', v_group.id,
+    'group_number', v_group.number,
+    'group_name', v_group.name,
+    'role', v_final_role,
+    'branch', v_inv.branch
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION accept_group_invitation(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION accept_group_invitation(text, text) TO authenticated;
+
+-- 4.2 Agregacion eficiente para Cron Push multi-tenant (50+ grupos sin limite de 1000 filas)
+
+CREATE OR REPLACE FUNCTION get_daily_reminder_group_stats(
+  p_camp_cutoff date,
+  p_medical_cutoff date,
+  p_task_cutoff date
+)
+RETURNS TABLE (
+  group_id uuid,
+  camps_count bigint,
+  medical_count bigint,
+  tasks_count bigint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH camp_counts AS (
+    SELECT c.group_id, count(*)::bigint AS cnt
+    FROM camp_checklists c
+    WHERE c.approval_status NOT IN ('aprobada', 'presentada_distrito')
+      AND c.district_submission_deadline <= p_camp_cutoff
+    GROUP BY c.group_id
+  ),
+  med_counts AS (
+    SELECT m.group_id, count(*)::bigint AS cnt
+    FROM group_members m
+    WHERE m.is_active = true
+      AND m.medical_form_expires_at IS NOT NULL
+      AND m.medical_form_expires_at <= p_medical_cutoff
+    GROUP BY m.group_id
+  ),
+  task_counts AS (
+    SELECT t.group_id, count(*)::bigint AS cnt
+    FROM council_tasks t
+    WHERE t.status IN ('pendiente', 'en_progreso')
+      AND t.due_date IS NOT NULL
+      AND t.due_date <= p_task_cutoff
+    GROUP BY t.group_id
+  ),
+  all_groups AS (
+    SELECT group_id FROM camp_counts
+    UNION
+    SELECT group_id FROM med_counts
+    UNION
+    SELECT group_id FROM task_counts
+  )
+  SELECT
+    g.group_id,
+    COALESCE(cc.cnt, 0) AS camps_count,
+    COALESCE(mc.cnt, 0) AS medical_count,
+    COALESCE(tc.cnt, 0) AS tasks_count
+  FROM all_groups g
+  LEFT JOIN camp_counts cc ON cc.group_id = g.group_id
+  LEFT JOIN med_counts mc ON mc.group_id = g.group_id
+  LEFT JOIN task_counts tc ON tc.group_id = g.group_id;
+$$;
+
+REVOKE ALL ON FUNCTION get_daily_reminder_group_stats(date, date, date) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_daily_reminder_group_stats(date, date, date) TO service_role;
+
 -- 5. Busqueda vectorial semantica de normativa SAAC
 
 CREATE OR REPLACE FUNCTION match_saac_documents(
@@ -379,6 +874,9 @@ ALTER TABLE scout_groups FORCE ROW LEVEL SECURITY;
 ALTER TABLE group_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_memberships FORCE ROW LEVEL SECURITY;
 
+ALTER TABLE group_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_invitations FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_members FORCE ROW LEVEL SECURITY;
 
@@ -398,6 +896,7 @@ ALTER TABLE saac_knowledge_base FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE
   scout_groups,
   group_memberships,
+  group_invitations,
   group_members,
   camp_checklists,
   council_tasks,
@@ -408,6 +907,7 @@ FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   scout_groups,
   group_memberships,
+  group_invitations,
   group_members,
   camp_checklists,
   council_tasks,
@@ -424,12 +924,13 @@ CREATE POLICY scout_groups_select
   TO authenticated
   USING (is_group_member(id));
 
+-- El alta directa de tenants se realiza exclusivamente via RPC create_scout_group_tenant
 DROP POLICY IF EXISTS scout_groups_insert ON scout_groups;
 CREATE POLICY scout_groups_insert
   ON scout_groups
   FOR INSERT
   TO authenticated
-  WITH CHECK (has_group_role(id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+  WITH CHECK (false);
 
 DROP POLICY IF EXISTS scout_groups_update ON scout_groups;
 CREATE POLICY scout_groups_update
@@ -454,19 +955,67 @@ CREATE POLICY group_memberships_insert
   ON group_memberships
   FOR INSERT
   TO authenticated
-  WITH CHECK (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+  WITH CHECK (has_group_role(group_id, ARRAY['jefe_grupo']));
 
 DROP POLICY IF EXISTS group_memberships_update ON group_memberships;
 CREATE POLICY group_memberships_update
   ON group_memberships
   FOR UPDATE
   TO authenticated
-  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']))
-  WITH CHECK (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+  USING (has_group_role(group_id, ARRAY['jefe_grupo']))
+  WITH CHECK (has_group_role(group_id, ARRAY['jefe_grupo']));
 
 DROP POLICY IF EXISTS group_memberships_delete ON group_memberships;
 CREATE POLICY group_memberships_delete
   ON group_memberships
+  FOR DELETE
+  TO authenticated
+  USING (has_group_role(group_id, ARRAY['jefe_grupo']));
+
+-- 6.2b Politicas para group_invitations
+DROP POLICY IF EXISTS group_invitations_select ON group_invitations;
+CREATE POLICY group_invitations_select
+  ON group_invitations
+  FOR SELECT
+  TO authenticated
+  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+
+DROP POLICY IF EXISTS group_invitations_insert ON group_invitations;
+CREATE POLICY group_invitations_insert
+  ON group_invitations
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    has_group_role(group_id, ARRAY['jefe_grupo'])
+    OR (
+      has_group_role(group_id, ARRAY['subjefe_grupo'])
+      AND role IN ('jefe_rama', 'educador')
+    )
+  );
+
+DROP POLICY IF EXISTS group_invitations_update ON group_invitations;
+CREATE POLICY group_invitations_update
+  ON group_invitations
+  FOR UPDATE
+  TO authenticated
+  USING (
+    has_group_role(group_id, ARRAY['jefe_grupo'])
+    OR (
+      has_group_role(group_id, ARRAY['subjefe_grupo'])
+      AND role IN ('jefe_rama', 'educador')
+    )
+  )
+  WITH CHECK (
+    has_group_role(group_id, ARRAY['jefe_grupo'])
+    OR (
+      has_group_role(group_id, ARRAY['subjefe_grupo'])
+      AND role IN ('jefe_rama', 'educador')
+    )
+  );
+
+DROP POLICY IF EXISTS group_invitations_delete ON group_invitations;
+CREATE POLICY group_invitations_delete
+  ON group_invitations
   FOR DELETE
   TO authenticated
   USING (has_group_role(group_id, ARRAY['jefe_grupo']));
@@ -485,7 +1034,7 @@ CREATE POLICY group_members_insert
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'secretario', 'jefe_rama'])
+    has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'jefe_rama'])
   );
 
 DROP POLICY IF EXISTS group_members_update ON group_members;
@@ -494,10 +1043,10 @@ CREATE POLICY group_members_update
   FOR UPDATE
   TO authenticated
   USING (
-    has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'secretario', 'jefe_rama'])
+    has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'jefe_rama'])
   )
   WITH CHECK (
-    has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'secretario', 'jefe_rama'])
+    has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'jefe_rama'])
   );
 
 DROP POLICY IF EXISTS group_members_delete ON group_members;
@@ -571,7 +1120,7 @@ CREATE POLICY council_tasks_delete
   ON council_tasks
   FOR DELETE
   TO authenticated
-  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo', 'secretario']));
+  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
 
 -- 6.6 Politicas para push_subscriptions (estricto por user_id = auth.uid())
 DROP POLICY IF EXISTS push_subscriptions_select ON push_subscriptions;

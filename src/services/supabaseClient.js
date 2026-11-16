@@ -52,6 +52,32 @@ export async function signInWithEmailPassword(email, password) {
   };
 }
 
+export async function signUpWithEmailPassword(email, password, fullName = '') {
+  if (!supabase) {
+    return {
+      session: null,
+      user: null,
+      error: new Error('Supabase no esta configurado en este entorno.')
+    };
+  }
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: fullName
+      ? {
+          data: {
+            full_name: fullName
+          }
+        }
+      : undefined
+  });
+  return {
+    session: data?.session || null,
+    user: data?.user || null,
+    error
+  };
+}
+
 export async function signOutSupabase() {
   if (!supabase) {
     return { error: null };

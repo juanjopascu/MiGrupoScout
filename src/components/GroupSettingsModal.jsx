@@ -4,14 +4,16 @@ import {
   CheckCircle2,
   Cloud,
   HardDrive,
-  LogIn,
   LogOut,
   RefreshCw,
   Shield,
+  Users,
   X
 } from 'lucide-react';
+import { canEditGroupSettings, getRoleLabel } from '../domain/roles.js';
+import { isSupabaseConfigured } from '../services/supabaseClient.js';
 import { cleanUserText, formatDateAr } from '../utils/textSanitizer.js';
-import { isSupabaseConfigured, signInWithEmailPassword } from '../services/supabaseClient.js';
+import AuthTenantPanel from './AuthTenantPanel.jsx';
 
 export default function GroupSettingsModal({
   isOpen,
@@ -19,7 +21,15 @@ export default function GroupSettingsModal({
   groupProfile,
   onSaveGroupProfile,
   session,
+  userRole,
+  memberships = [],
+  activeGroupId,
+  hasActiveGroup,
+  pendingInviteCode,
+  onSwitchGroup,
+  onOpenTeamManager,
   onAuthChanged,
+  onTenantReady,
   onLogout,
   syncState,
   onManualSync,
@@ -32,10 +42,8 @@ export default function GroupSettingsModal({
   const [orgModel, setOrgModel] = useState(groupProfile?.org_model || 'tradicional');
   const [saveMessage, setSaveMessage] = useState(null);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
+  const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
+  const canEditGroup = isDemoMode || canEditGroupSettings(userRole);
 
   useEffect(() => {
     if (!isOpen) {
@@ -47,7 +55,6 @@ export default function GroupSettingsModal({
     setZone(groupProfile?.zone || '');
     setOrgModel(groupProfile?.org_model || 'tradicional');
     setSaveMessage(null);
-    setAuthError('');
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -64,6 +71,9 @@ export default function GroupSettingsModal({
 
   async function handleSaveGroup(event) {
     event.preventDefault();
+    if (!canEditGroup) {
+      return;
+    }
     const cleanedName = cleanUserText(name, { maxLength: 120 });
     const cleanedDistrict = cleanUserText(district, { maxLength: 80 });
     const cleanedZone = cleanUserText(zone, { maxLength: 80 });
@@ -92,28 +102,6 @@ export default function GroupSettingsModal({
     });
   }
 
-  async function handleLogin(event) {
-    event.preventDefault();
-    setAuthError('');
-    setAuthLoading(true);
-    try {
-      const { session: nextSession, error } = await signInWithEmailPassword(
-        email.trim(),
-        password
-      );
-      if (error) {
-        setAuthError(error.message || 'No se pudo iniciar sesion.');
-        return;
-      }
-      if (nextSession) {
-        setPassword('');
-        await onAuthChanged(nextSession);
-      }
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 p-0 sm:p-4"
@@ -134,7 +122,7 @@ export default function GroupSettingsModal({
           <div className="flex items-center gap-2.5">
             <Shield className="w-5 h-5 text-[#1B365D]" aria-hidden="true" />
             <h2 id="group-settings-title" className="text-lg font-semibold text-slate-900">
-              Ajustes del Grupo y Sincronizacion
+              Ajustes del Grupo y Tenant
             </h2>
           </div>
           <button
@@ -148,23 +136,24 @@ export default function GroupSettingsModal({
         </div>
 
         <div className="p-5 space-y-6">
-          {/* Estado de almacenamiento y sincronizacion */}
           <section className="rounded-xl border border-slate-300 bg-slate-50 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 {session && isSupabaseConfigured ? (
-                  <Cloud className="w-4 h-4 text-[#1B365D]" aria-hidden="true" />
+                  <Cloud className="w-4 h-4 text-[#1B365D] shrink-0" aria-hidden="true" />
                 ) : (
-                  <HardDrive className="w-4 h-4 text-slate-700" aria-hidden="true" />
+                  <HardDrive className="w-4 h-4 text-slate-700 shrink-0" aria-hidden="true" />
                 )}
-                <h3 className="text-sm font-semibold text-slate-900">
+                <h3 className="text-sm font-semibold text-slate-900 truncate">
                   {session && isSupabaseConfigured
-                    ? 'Cuenta vinculada a Supabase'
+                    ? hasActiveGroup
+                      ? `Tenant activo - Rol: ${getRoleLabel(userRole)}`
+                      : 'Cuenta conectada (sin Grupo asignado)'
                     : 'Modo Local Offline-First (Demo Editable)'}
                 </h3>
               </div>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${
                   isOnline
                     ? 'bg-green-100 border-green-700 text-green-900'
                     : 'bg-amber-100 border-amber-700 text-amber-900'
@@ -174,40 +163,72 @@ export default function GroupSettingsModal({
               </span>
             </div>
 
+            {session && memberships.length > 1 && (
+              <div>
+                <label htmlFor="tenant-switcher" className="block text-xs font-medium text-slate-700 mb-1">
+                  Cambiar de Grupo Scout (Tenant)
+                </label>
+                <select
+                  id="tenant-switcher"
+                  value={activeGroupId || ''}
+                  onChange={(e) => onSwitchGroup(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-slate-400 text-sm text-slate-900 bg-white"
+                >
+                  {memberships.map((m) => (
+                    <option key={m.group_id} value={m.group_id}>
+                      Nro. {m.scout_groups?.number || '-'} - {m.scout_groups?.name || 'Grupo'} ({getRoleLabel(m.role)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="text-xs text-slate-700 space-y-1">
               <p>
                 Cambios pendientes en cola local:{' '}
                 <span className="font-mono font-semibold">{syncState.pendingCount}</span>
-                {syncState.conflictCount > 0
-                  ? ` | Conflictos: ${syncState.conflictCount}`
-                  : ''}
+                {syncState.conflictCount > 0 ? ` | Conflictos: ${syncState.conflictCount}` : ''}
               </p>
               {syncState.lastSyncAt ? (
                 <p>
                   Ultima sincronizacion:{' '}
-                  <span className="font-mono">
-                    {formatDateAr(syncState.lastSyncAt.slice(0, 10))}
-                  </span>
+                  <span className="font-mono">{formatDateAr(syncState.lastSyncAt.slice(0, 10))}</span>
                 </p>
               ) : (
                 <p>Datos persistidos localmente en IndexedDB (consejoscout_db_v1).</p>
               )}
             </div>
 
-            {session && isSupabaseConfigured ? (
+            {session && isSupabaseConfigured && (
               <div className="flex flex-wrap gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={onManualSync}
-                  disabled={!isOnline || syncState.isSyncing}
-                  className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 ${syncState.isSyncing ? 'animate-spin' : ''}`}
-                    aria-hidden="true"
-                  />
-                  <span>Sincronizar ahora</span>
-                </button>
+                {hasActiveGroup && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenTeamManager();
+                    }}
+                    className="h-11 px-4 inline-flex items-center gap-2 rounded-lg bg-[#1B365D] text-white hover:bg-[#122643] text-sm font-semibold"
+                  >
+                    <Users className="w-4 h-4" aria-hidden="true" />
+                    <span>Equipo e Invitaciones</span>
+                  </button>
+                )}
+
+                {hasActiveGroup && (
+                  <button
+                    type="button"
+                    onClick={onManualSync}
+                    disabled={!isOnline || syncState.isSyncing}
+                    className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`w-4 h-4 ${syncState.isSyncing ? 'animate-spin' : ''}`}
+                      aria-hidden="true"
+                    />
+                    <span>Sincronizar</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -215,192 +236,140 @@ export default function GroupSettingsModal({
                   className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-red-700 text-red-900 bg-red-50 hover:bg-red-100 text-sm font-semibold"
                 >
                   <LogOut className="w-4 h-4" aria-hidden="true" />
-                  <span>Cerrar sesion y purgar cache</span>
+                  <span>Cerrar sesion</span>
                 </button>
               </div>
-            ) : null}
+            )}
           </section>
 
-          {/* Formulario del Grupo Scout */}
-          <form onSubmit={handleSaveGroup} className="space-y-4">
-            <h3 className="text-base font-semibold text-slate-900">
-              Identidad del Grupo Scout
-            </h3>
+          {(!session || !hasActiveGroup || isSupabaseConfigured) && (
+            <AuthTenantPanel
+              session={session}
+              pendingInviteCode={pendingInviteCode}
+              hasActiveGroup={hasActiveGroup}
+              onAuthChanged={onAuthChanged}
+              onTenantReady={onTenantReady}
+            />
+          )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label
-                  htmlFor="group-number-input"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Nro. de Grupo
-                </label>
-                <input
-                  id="group-number-input"
-                  type="number"
-                  min={1}
-                  value={number}
-                  onChange={(e) => setNumber(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white font-mono"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label
-                  htmlFor="group-name-input"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Nombre oficial del Grupo
-                </label>
-                <input
-                  id="group-name-input"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label
-                  htmlFor="group-district-input"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Distrito
-                </label>
-                <input
-                  id="group-district-input"
-                  type="text"
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="group-zone-input"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Zona
-                </label>
-                <input
-                  id="group-zone-input"
-                  type="text"
-                  value={zone}
-                  onChange={(e) => setZone(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="group-org-model"
-                  className="block text-sm font-medium text-slate-700 mb-1"
-                >
-                  Modalidad
-                </label>
-                <select
-                  id="group-org-model"
-                  value={orgModel}
-                  onChange={(e) => setOrgModel(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
-                >
-                  <option value="tradicional">Tradicional</option>
-                  <option value="nucleo">Nucleo</option>
-                  <option value="comunitario">Comunitario</option>
-                  <option value="escolar">Escolar</option>
-                </select>
-              </div>
-            </div>
-
-            {saveMessage && (
-              <div
-                aria-live="polite"
-                className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${
-                  saveMessage.type === 'success'
-                    ? 'bg-green-100 border-green-700 text-green-900'
-                    : 'bg-red-100 border-red-700 text-red-900'
-                }`}
-              >
-                {saveMessage.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+          {(isDemoMode || hasActiveGroup) && (
+            <form onSubmit={handleSaveGroup} className="pt-4 border-t border-slate-200 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-slate-900">
+                  Identidad del Grupo Scout
+                </h3>
+                {!canEditGroup && (
+                  <span className="text-xs font-medium text-slate-600">
+                    Solo lectura (Jefe/Subjefe)
+                  </span>
                 )}
-                <span>{saveMessage.text}</span>
               </div>
-            )}
 
-            <button
-              type="submit"
-              className="w-full h-12 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors"
-            >
-              Guardar datos del Grupo
-            </button>
-          </form>
-
-          {/* Acceso Supabase (solo si esta configurado y sin sesion) */}
-          {!session && isSupabaseConfigured && (
-            <form
-              onSubmit={handleLogin}
-              className="pt-4 border-t border-slate-200 space-y-3"
-            >
-              <h3 className="text-base font-semibold text-slate-900">
-                Iniciar sesion con cuenta del Grupo (Supabase)
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label
-                    htmlFor="auth-email"
-                    className="block text-sm font-medium text-slate-700 mb-1"
-                  >
-                    Correo institucional
+                  <label htmlFor="group-number-input" className="block text-sm font-medium text-slate-700 mb-1">
+                    Nro. de Grupo
                   </label>
                   <input
-                    id="auth-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="jefatura@gruposcout.org.ar"
-                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
+                    id="group-number-input"
+                    type="number"
+                    min={1}
+                    disabled={!canEditGroup}
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white font-mono disabled:bg-slate-100"
                   />
                 </div>
-                <div>
-                  <label
-                    htmlFor="auth-password"
-                    className="block text-sm font-medium text-slate-700 mb-1"
-                  >
-                    Contrasena
+
+                <div className="sm:col-span-2">
+                  <label htmlFor="group-name-input" className="block text-sm font-medium text-slate-700 mb-1">
+                    Nombre oficial del Grupo
                   </label>
                   <input
-                    id="auth-password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
+                    id="group-name-input"
+                    type="text"
+                    disabled={!canEditGroup}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white disabled:bg-slate-100"
                   />
                 </div>
               </div>
 
-              {authError && (
-                <p role="alert" className="text-sm text-red-900 bg-red-100 border border-red-700 rounded-lg p-2.5">
-                  {authError}
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label htmlFor="group-district-input" className="block text-sm font-medium text-slate-700 mb-1">
+                    Distrito
+                  </label>
+                  <input
+                    id="group-district-input"
+                    type="text"
+                    disabled={!canEditGroup}
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white disabled:bg-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="group-zone-input" className="block text-sm font-medium text-slate-700 mb-1">
+                    Zona
+                  </label>
+                  <input
+                    id="group-zone-input"
+                    type="text"
+                    disabled={!canEditGroup}
+                    value={zone}
+                    onChange={(e) => setZone(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white disabled:bg-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="group-org-model" className="block text-sm font-medium text-slate-700 mb-1">
+                    Modalidad
+                  </label>
+                  <select
+                    id="group-org-model"
+                    disabled={!canEditGroup}
+                    value={orgModel}
+                    onChange={(e) => setOrgModel(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white disabled:bg-slate-100"
+                  >
+                    <option value="tradicional">Tradicional</option>
+                    <option value="nucleo">Nucleo</option>
+                    <option value="comunitario">Comunitario</option>
+                    <option value="escolar">Escolar</option>
+                  </select>
+                </div>
+              </div>
+
+              {saveMessage && (
+                <div
+                  aria-live="polite"
+                  className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${
+                    saveMessage.type === 'success'
+                      ? 'bg-green-100 border-green-700 text-green-900'
+                      : 'bg-red-100 border-red-700 text-red-900'
+                  }`}
+                >
+                  {saveMessage.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  )}
+                  <span>{saveMessage.text}</span>
+                </div>
               )}
 
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full h-11 inline-flex items-center justify-center gap-2 border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] font-semibold rounded-lg transition-colors disabled:opacity-50"
-              >
-                <LogIn className="w-4 h-4" aria-hidden="true" />
-                <span>{authLoading ? 'Ingresando...' : 'Conectar cuenta del Grupo'}</span>
-              </button>
+              {canEditGroup && (
+                <button
+                  type="submit"
+                  className="w-full h-12 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors"
+                >
+                  Guardar datos del Grupo
+                </button>
+              )}
             </form>
           )}
         </div>

@@ -9,10 +9,12 @@ import {
   Settings,
   Shield,
   Tent,
+  Users,
   Wifi,
   WifiOff,
   X
 } from 'lucide-react';
+import { getRoleLabel } from '../domain/roles.js';
 
 export const NAV_ITEMS = Object.freeze([
   Object.freeze({
@@ -63,9 +65,12 @@ export default function AppShell({
   activeTab,
   onSelectTab,
   groupProfile,
+  userRole,
+  isDemoMode,
   isOnline,
   pushState,
   onOpenPushManager,
+  onOpenTeamManager,
   onOpenSettings,
   syncState,
   needRefresh,
@@ -74,8 +79,9 @@ export default function AppShell({
   children
 }) {
   const activeNav = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+  const roleTag = isDemoMode ? 'Demo' : getRoleLabel(userRole);
   const groupSubtitle = groupProfile
-    ? `Nro. ${groupProfile.number || '-'} - ${groupProfile.district || 'Distrito'}`
+    ? `Nro. ${groupProfile.number || '-'} - ${roleTag}`
     : 'ConsejoScout SAAC';
 
   return (
@@ -150,6 +156,18 @@ export default function AppShell({
             <span className="hidden lg:inline truncate">Alertas Push</span>
           </button>
 
+          {onOpenTeamManager && (
+            <button
+              type="button"
+              onClick={onOpenTeamManager}
+              aria-label="Equipo e invitaciones"
+              className="w-full min-h-[44px] px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 flex items-center justify-center lg:justify-start gap-3 text-sm font-medium text-slate-800"
+            >
+              <Users className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
+              <span className="hidden lg:inline truncate">Equipo</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onOpenSettings}
@@ -203,6 +221,17 @@ export default function AppShell({
             >
               <PushBellIcon pushState={pushState} />
             </button>
+
+            {onOpenTeamManager && (
+              <button
+                type="button"
+                onClick={onOpenTeamManager}
+                aria-label="Equipo e invitaciones"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100"
+              >
+                <Users className="w-5 h-5" aria-hidden="true" />
+              </button>
+            )}
 
             <button
               type="button"

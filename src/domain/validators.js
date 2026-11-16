@@ -49,8 +49,6 @@ export const ALLOWED_ASSIGNED_ROLES = Object.freeze([
   'subjefe_grupo',
   'jefe_rama',
   'educador',
-  'secretario',
-  'tesorero',
   'consejo_pleno'
 ]);
 

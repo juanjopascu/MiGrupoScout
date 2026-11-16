@@ -1,5 +1,7 @@
 import { Compass, GraduationCap, Library, Users } from 'lucide-react';
 
+import { GROUP_ROLE_LABELS } from '../../domain/roles.js';
+
 export const BRANCH_FILTERS = Object.freeze([
   { id: 'todas', label: 'Todas' },
   { id: 'manada', label: 'Manada' },
@@ -25,15 +27,7 @@ export const BRANCH_SHORT_LABELS = Object.freeze({
   jefatura: 'Adultos'
 });
 
-export const ROLE_LABELS = Object.freeze({
-  jefe_grupo: 'Jefe de Grupo',
-  subjefe_grupo: 'Subjefe de Grupo',
-  jefe_rama: 'Jefe de Rama',
-  educador: 'Educador',
-  secretario: 'Secretario/a',
-  tesorero: 'Tesorero/a',
-  consejo_pleno: 'Consejo Pleno'
-});
+export const ROLE_LABELS = GROUP_ROLE_LABELS;
 
 export const SAAC_ICON_MAP = Object.freeze({
   Users,

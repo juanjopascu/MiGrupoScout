@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { sanitizePushPayload } from '../_lib/payloadSanitizer.js';
 import { dispatchPushNotifications } from '../_lib/pushDispatcher.js';
 
-const LEADERSHIP_ROLES = ['jefe_grupo', 'subjefe_grupo', 'secretario', 'jefe_rama'];
+const LEADERSHIP_ROLES = ['jefe_grupo', 'subjefe_grupo', 'jefe_rama'];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isValidUuid(value) {

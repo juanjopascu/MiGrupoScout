@@ -13,7 +13,8 @@ export const LS_KEYS = Object.freeze({
   INSTALL_DISMISSED_AT: 'consejoscout:install_dismissed_at',
   PUSH_PREFS: 'consejoscout:push_prefs',
   CAMP_ALERTS: 'consejoscout:scheduled_camp_alerts',
-  DEMO_INITIALIZED: 'consejoscout:demo_initialized'
+  DEMO_INITIALIZED: 'consejoscout:demo_initialized',
+  PENDING_INVITE_CODE: 'consejoscout:pending_invite_code'
 });
 
 let dbPromise = null;
@@ -61,6 +62,7 @@ export function buildDemoSeedData(groupId = DEMO_GROUP_ID) {
     district: 'Distrito 2',
     zone: 'Zona 14',
     org_model: 'tradicional',
+    userRole: 'jefe_grupo',
     isDemo: true,
     updated_at: nowIso
   };
@@ -343,7 +345,7 @@ export function buildDemoSeedData(groupId = DEMO_GROUP_ID) {
       group_id: groupId,
       title: 'Solicitar renovacion de fichas medicas por vencer en Manada',
       description: 'Enviar comunicado por canal de familias con fecha limite de entrega.',
-      assigned_role: 'secretario',
+      assigned_role: 'subjefe_grupo',
       branch: 'manada',
       due_date: relativeIsoDate(7),
       status: 'pendiente',
@@ -356,7 +358,7 @@ export function buildDemoSeedData(groupId = DEMO_GROUP_ID) {
       group_id: groupId,
       title: 'Verificar altas pendientes en sistema Cruz del Sur',
       description: 'Validar comprobantes de afiliacion de Manada y Comunidad Rover.',
-      assigned_role: 'tesorero',
+      assigned_role: 'educador',
       branch: 'rovers',
       due_date: relativeIsoDate(-1),
       status: 'completada',
@@ -487,6 +489,29 @@ export async function upsertCachedRecord(entity, groupId, record) {
 
   await setCachedCollection(entity, groupId, updated);
   return { record: nextRecord, list: updated, isNew: idx < 0 };
+}
+
+export async function upsertCachedBatch(entity, groupId, records = []) {
+  const current = await getCachedCollection(entity, groupId);
+  const nowIso = new Date().toISOString();
+  const byId = new Map(current.map((item) => [item.id, item]));
+  const prepared = [];
+
+  for (const raw of records) {
+    const id = raw.id || generateLocalId(entity);
+    const nextRecord = {
+      ...raw,
+      id,
+      group_id: groupId,
+      updated_at: nowIso
+    };
+    byId.set(id, nextRecord);
+    prepared.push(nextRecord);
+  }
+
+  const updated = Array.from(byId.values());
+  await setCachedCollection(entity, groupId, updated);
+  return { records: prepared, list: updated };
 }
 
 export async function deleteCachedRecord(entity, groupId, recordId) {

@@ -1,4 +1,7 @@
-import { ClipboardList, Plus, Users } from 'lucide-react';
+import { useState } from 'react';
+import { ClipboardList, FileSpreadsheet, Plus, Users } from 'lucide-react';
+import MemberCsvImportModal from '../components/MemberCsvImportModal.jsx';
+import { canDeleteRecords, canEditMembers, getRoleLabel } from '../domain/roles.js';
 import { cleanUserText } from '../utils/textSanitizer.js';
 import MemberListPanel from './dashboard/MemberListPanel.jsx';
 import MemberModal from './dashboard/MemberModal.jsx';
@@ -12,17 +15,26 @@ import { useDashboardState } from './dashboard/useDashboardState.js';
 
 export default function Dashboard({
   groupProfile,
+  userRole = 'jefe_grupo',
+  isDemoMode = false,
+  hasActiveGroup = true,
   members,
   camps,
   tasks,
   pushState,
   onOpenPushManager,
+  onOpenTeamManager,
+  onOpenSettings,
   onOpenCampPlanner,
   onSaveTask,
   onDeleteTask,
   onSaveMember,
+  onBatchImportMembers,
   onDeleteMember
 }) {
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const canEditNomina = isDemoMode || canEditMembers(userRole);
+  const canDelete = isDemoMode || canDeleteRecords(userRole);
   const {
     activeSegment,
     setActiveSegment,
@@ -63,17 +75,40 @@ export default function Dashboard({
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Tablero del Grupo
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Tablero del Grupo
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold border border-[#1B365D] bg-[#EBF2FA] text-[#1B365D]">
+              {isDemoMode ? 'Demo Local' : getRoleLabel(userRole)}
+            </span>
+          </div>
           <p className="text-sm text-slate-700 mt-0.5">
             {cleanUserText(groupProfile?.name || 'Grupo Scout')} - {cleanUserText(groupProfile?.district || 'Distrito')} ({cleanUserText(groupProfile?.zone || 'Zona')})
           </p>
         </div>
-        <div className="w-full lg:max-w-md">
+        <div className="w-full lg:max-w-md space-y-2">
           <PushStatusWidget pushState={pushState} onOpen={onOpenPushManager} />
         </div>
       </div>
+
+      {!hasActiveGroup && (
+        <div className="p-4 rounded-xl border border-[#1B365D] bg-[#EBF2FA] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-slate-900">
+            <p className="font-semibold">Todavia no vinculaste tu cuenta a un Grupo Scout</p>
+            <p className="text-xs text-slate-700">
+              Si sos Jefe de Grupo crea tu Grupo (tenant), o ingresa con el codigo de invitacion que te enviaron.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="h-10 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-xs sm:text-sm font-semibold shrink-0"
+          >
+            Configurar o aceptar invitacion
+          </button>
+        </div>
+      )}
 
       <TrafficLightCards
         affiliationStats={affiliationStats}
@@ -141,16 +176,38 @@ export default function Dashboard({
               <Plus className="w-4 h-4" aria-hidden="true" />
               <span>Nueva tarea</span>
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={openNewMemberModal}
-              className="h-11 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
-            >
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              <span>Agregar miembro</span>
-            </button>
-          )}
+          ) : canEditNomina ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {onOpenTeamManager && !isDemoMode && (
+                <button
+                  type="button"
+                  onClick={onOpenTeamManager}
+                  className="h-11 px-3.5 rounded-lg border border-slate-300 text-slate-800 hover:bg-slate-100 text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Users className="w-4 h-4" aria-hidden="true" />
+                  <span>Dirigentes</span>
+                </button>
+              )}
+              {onBatchImportMembers && (
+                <button
+                  type="button"
+                  onClick={() => setCsvModalOpen(true)}
+                  className="h-11 px-3.5 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
+                  <span>Importar CSV</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openNewMemberModal}
+                className="h-11 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                <span>Agregar miembro</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div
@@ -182,7 +239,7 @@ export default function Dashboard({
             tasks={filteredTasks}
             onToggleStatus={handleToggleTaskStatus}
             onEditTask={openEditTaskModal}
-            onDeleteTask={onDeleteTask}
+            onDeleteTask={canDelete ? onDeleteTask : undefined}
           />
         )}
 
@@ -193,6 +250,8 @@ export default function Dashboard({
             onMemberSearchChange={setMemberSearch}
             memberQuickFilter={memberQuickFilter}
             onClearQuickFilter={() => setMemberQuickFilter('all')}
+            canEdit={canEditNomina}
+            canDelete={canDelete}
             onEditMember={openEditMemberModal}
             onDeleteMember={onDeleteMember}
           />
@@ -217,6 +276,12 @@ export default function Dashboard({
         memberErrors={memberErrors}
         onClose={() => setMemberModalOpen(false)}
         onSubmit={handleSubmitMember}
+      />
+
+      <MemberCsvImportModal
+        isOpen={csvModalOpen}
+        onClose={() => setCsvModalOpen(false)}
+        onImportBatch={onBatchImportMembers}
       />
     </div>
   );
