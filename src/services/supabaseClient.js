@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { ENV, isSupabaseConfigured } from '../config/env.js';
+import {
+  getLocalSession,
+  signInLocalUser,
+  signOutLocalUser,
+  signUpLocalUser
+} from './localAuthStore.js';
 
 /**
- * Cliente singleton de Supabase con inicializacion condicional segura.
- * Si faltan variables VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY, expone
- * isSupabaseConfigured = false para operar en modo local/demo sin errores.
+ * Cliente singleton de Supabase con persistencia dual:
+ * si VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY estan presentes usa Supabase Auth;
+ * de lo contrario opera de forma transparente sobre el motor local de cuentas (estilo Patitas).
  */
 export const supabase = isSupabaseConfigured
   ? createClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY, {
@@ -20,7 +26,7 @@ export { isSupabaseConfigured };
 
 export async function getCurrentSession() {
   if (!supabase) {
-    return null;
+    return getLocalSession();
   }
   try {
     const { data, error } = await supabase.auth.getSession();
@@ -35,11 +41,7 @@ export async function getCurrentSession() {
 
 export async function signInWithEmailPassword(email, password) {
   if (!supabase) {
-    return {
-      session: null,
-      user: null,
-      error: new Error('Supabase no esta configurado en este entorno.')
-    };
+    return signInLocalUser(email, password);
   }
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -54,11 +56,7 @@ export async function signInWithEmailPassword(email, password) {
 
 export async function signUpWithEmailPassword(email, password, fullName = '') {
   if (!supabase) {
-    return {
-      session: null,
-      user: null,
-      error: new Error('Supabase no esta configurado en este entorno.')
-    };
+    return signUpLocalUser(email, password, fullName);
   }
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -81,7 +79,9 @@ export async function signUpWithEmailPassword(email, password, fullName = '') {
 export async function resetPasswordForEmail(email) {
   if (!supabase) {
     return {
-      error: new Error('Supabase no esta configurado en este entorno.')
+      error: new Error(
+        'En modo de cuentas local podes crear una cuenta nueva o iniciar sesion desde este dispositivo.'
+      )
     };
   }
   const redirectTo =
@@ -91,7 +91,7 @@ export async function resetPasswordForEmail(email) {
 
 export async function signOutSupabase() {
   if (!supabase) {
-    return { error: null };
+    return signOutLocalUser();
   }
   return supabase.auth.signOut();
 }

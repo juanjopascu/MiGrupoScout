@@ -66,7 +66,7 @@ export default function GroupSettingsModal({
   const [logoUrl, setLogoUrl] = useState(groupProfile?.logo_url || null);
   const [saveMessage, setSaveMessage] = useState(null);
 
-  const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
+  const isDemoMode = !session || !hasActiveGroup;
   const canEditGroup = isDemoMode || canEditGroupSettings(userRole);
   const canEditBranding = isDemoMode || canEditGroupBranding(userRole);
 
@@ -196,19 +196,18 @@ export default function GroupSettingsModal({
                   <HardDrive className="w-4 h-4 text-slate-700 shrink-0" aria-hidden="true" />
                 )}
                 <h3 className="text-sm font-semibold text-slate-900 truncate">
-                  {session && isSupabaseConfigured
-                    ? hasActiveGroup
-                      ? `Tenant activo - Rol: ${getRoleLabel(userRole)}`
-                      : 'Cuenta conectada (sin Grupo asignado)'
-                    : 'Modo Local Offline-First (Demo Editable)'}
+                  {session && hasActiveGroup
+                    ? `${isSupabaseConfigured && !session.isLocal ? 'Tenant nube' : 'Cuenta local'} - Rol: ${getRoleLabel(userRole)}`
+                    : session
+                      ? 'Cuenta conectada (sin Grupo asignado)'
+                      : 'Modo Local Offline-First (Demo Editable)'}
                 </h3>
               </div>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${
-                  isOnline
-                    ? 'bg-green-100 border-green-700 text-green-900'
-                    : 'bg-amber-100 border-amber-700 text-amber-900'
-                }`}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${isOnline
+                  ? 'bg-green-100 border-green-700 text-green-900'
+                  : 'bg-amber-100 border-amber-700 text-amber-900'
+                  }`}
               >
                 {!networkOnline
                   ? 'Sin internet'
@@ -260,11 +259,10 @@ export default function GroupSettingsModal({
                   type="button"
                   onClick={onToggleManualOffline}
                   aria-pressed={manualOffline}
-                  className={`h-11 px-4 inline-flex items-center gap-2 rounded-lg border text-sm font-semibold ${
-                    manualOffline
-                      ? 'border-amber-700 bg-amber-100 text-amber-900 hover:bg-amber-200'
-                      : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'
-                  }`}
+                  className={`h-11 px-4 inline-flex items-center gap-2 rounded-lg border text-sm font-semibold ${manualOffline
+                    ? 'border-amber-700 bg-amber-100 text-amber-900 hover:bg-amber-200'
+                    : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'
+                    }`}
                 >
                   {manualOffline ? (
                     <Wifi className="w-4 h-4" aria-hidden="true" />
@@ -310,7 +308,7 @@ export default function GroupSettingsModal({
               )}
             </div>
 
-            {session && isSupabaseConfigured && (
+            {session && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {hasActiveGroup && (
                   <button
@@ -338,7 +336,7 @@ export default function GroupSettingsModal({
             )}
           </section>
 
-          {(!session || !hasActiveGroup || isSupabaseConfigured) && (
+          {(!session || !hasActiveGroup || isSupabaseConfigured || !isDemoMode) && (
             <AuthTenantPanel
               session={session}
               pendingInviteCode={pendingInviteCode}
@@ -455,11 +453,10 @@ export default function GroupSettingsModal({
               {saveMessage && (
                 <div
                   aria-live="polite"
-                  className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${
-                    saveMessage.type === 'success'
-                      ? 'bg-green-100 border-green-700 text-green-900'
-                      : 'bg-red-100 border-red-700 text-red-900'
-                  }`}
+                  className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${saveMessage.type === 'success'
+                    ? 'bg-green-100 border-green-700 text-green-900'
+                    : 'bg-red-100 border-red-700 text-red-900'
+                    }`}
                 >
                   {saveMessage.type === 'success' ? (
                     <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />

@@ -5,6 +5,18 @@ import {
   validateInvitationInput
 } from '../domain/roles.js';
 import { isValidUuid } from '../domain/validators.js';
+import {
+  acceptLocalInvitation,
+  createLocalGroupTenant,
+  createLocalInvitation,
+  listLocalGroupTeam,
+  listLocalInvitations,
+  listLocalUserMemberships,
+  previewLocalInvitation,
+  removeLocalTeamMember,
+  revokeLocalInvitation,
+  updateLocalTeamMember
+} from './localAuthStore.js';
 import { LS_KEYS, readLocalPref, writeLocalPref } from './offlineDb.js';
 import { isSupabaseConfigured, supabase } from './supabaseClient.js';
 
@@ -19,8 +31,11 @@ export function savePendingInviteCode(code) {
 }
 
 export async function listUserGroupMemberships(userId) {
-  if (!isSupabaseConfigured || !supabase || !userId) {
+  if (!userId) {
     return [];
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return listLocalUserMemberships(userId);
   }
 
   const { data, error } = await supabase
@@ -39,10 +54,7 @@ export async function listUserGroupMemberships(userId) {
 
 export async function createScoutGroupTenant(input) {
   if (!isSupabaseConfigured || !supabase) {
-    return {
-      ok: false,
-      error: 'Supabase no esta configurado en este entorno.'
-    };
+    return createLocalGroupTenant(input);
   }
 
   const validation = validateGroupTenantInput(input);
@@ -83,10 +95,7 @@ export async function previewGroupInvitation(rawCode) {
     return { valid: false, error: 'El formato del codigo de invitacion no es valido.' };
   }
   if (!isSupabaseConfigured || !supabase) {
-    return {
-      valid: false,
-      error: 'Conecta Supabase para validar invitaciones remotas.'
-    };
+    return previewLocalInvitation(code);
   }
 
   const { data, error } = await supabase.rpc('preview_group_invitation', {
@@ -109,7 +118,11 @@ export async function acceptGroupInvitation(rawCode, displayName = '') {
     return { ok: false, error: 'Codigo de invitacion invalido.' };
   }
   if (!isSupabaseConfigured || !supabase) {
-    return { ok: false, error: 'Supabase no esta configurado.' };
+    const res = acceptLocalInvitation(code, displayName);
+    if (res.ok) {
+      savePendingInviteCode('');
+    }
+    return res;
   }
 
   const { data, error } = await supabase.rpc('accept_group_invitation', {
@@ -136,8 +149,11 @@ export async function acceptGroupInvitation(rawCode, displayName = '') {
 }
 
 export async function listGroupTeamMembers(groupId) {
-  if (!isSupabaseConfigured || !supabase || !isValidUuid(groupId)) {
+  if (!isValidUuid(groupId)) {
     return [];
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return listLocalGroupTeam(groupId);
   }
 
   const { data, error } = await supabase
@@ -153,8 +169,11 @@ export async function listGroupTeamMembers(groupId) {
 }
 
 export async function updateTeamMemberRole({ membershipId, role, branch, isActive }) {
-  if (!isSupabaseConfigured || !supabase || !isValidUuid(membershipId)) {
+  if (!isValidUuid(membershipId)) {
     return { ok: false, error: 'Parametros invalidos para actualizar rol.' };
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return updateLocalTeamMember({ membershipId, role, branch, isActive });
   }
 
   const patch = {};
@@ -176,8 +195,11 @@ export async function updateTeamMemberRole({ membershipId, role, branch, isActiv
 }
 
 export async function removeTeamMember(membershipId) {
-  if (!isSupabaseConfigured || !supabase || !isValidUuid(membershipId)) {
+  if (!isValidUuid(membershipId)) {
     return { ok: false, error: 'Identificador de membresia invalido.' };
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return removeLocalTeamMember(membershipId);
   }
 
   const { error } = await supabase
@@ -192,8 +214,11 @@ export async function removeTeamMember(membershipId) {
 }
 
 export async function listGroupInvitations(groupId) {
-  if (!isSupabaseConfigured || !supabase || !isValidUuid(groupId)) {
+  if (!isValidUuid(groupId)) {
     return [];
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return listLocalInvitations(groupId);
   }
 
   const { data, error } = await supabase
@@ -210,7 +235,7 @@ export async function listGroupInvitations(groupId) {
 
 export async function createGroupInvitation(input, actorRole = 'jefe_grupo') {
   if (!isSupabaseConfigured || !supabase) {
-    return { ok: false, error: 'Supabase no esta configurado.' };
+    return createLocalInvitation(input, actorRole);
   }
 
   const validation = validateInvitationInput(input, actorRole);
@@ -237,8 +262,11 @@ export async function createGroupInvitation(input, actorRole = 'jefe_grupo') {
 }
 
 export async function revokeGroupInvitation(invitationId) {
-  if (!isSupabaseConfigured || !supabase || !isValidUuid(invitationId)) {
+  if (!isValidUuid(invitationId)) {
     return { ok: false, error: 'Identificador de invitacion invalido.' };
+  }
+  if (!isSupabaseConfigured || !supabase) {
+    return revokeLocalInvitation(invitationId);
   }
 
   const { error } = await supabase

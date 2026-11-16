@@ -15,6 +15,10 @@ import {
   upsertCachedRecord,
   writeLocalPref
 } from './offlineDb.js';
+import {
+  listLocalUserMemberships,
+  updateLocalGroupRecord
+} from './localAuthStore.js';
 import { getCurrentSession, isSupabaseConfigured, supabase } from './supabaseClient.js';
 
 const syncListeners = new Set();
@@ -138,7 +142,8 @@ export async function saveEntityOfflineFirst({ table, groupId, record, isNewHint
   );
 
   const session = await getCurrentSession();
-  const isRemoteGroup = isSupabaseConfigured && session && groupId !== DEMO_GROUP_ID;
+  const isRemoteGroup =
+    isSupabaseConfigured && session && !session.isLocal && groupId !== DEMO_GROUP_ID;
 
   if (isRemoteGroup) {
     await enqueueOutboxMutation({
@@ -171,7 +176,8 @@ export async function batchSaveMembersOfflineFirst({ groupId, records = [] }) {
   );
 
   const session = await getCurrentSession();
-  const isRemoteGroup = isSupabaseConfigured && session && groupId !== DEMO_GROUP_ID;
+  const isRemoteGroup =
+    isSupabaseConfigured && session && !session.isLocal && groupId !== DEMO_GROUP_ID;
 
   if (isRemoteGroup) {
     const payloads = savedRecords.map((item) => toDbPayload('group_members', item));
@@ -219,7 +225,8 @@ export async function deleteEntityOfflineFirst({ table, groupId, recordId }) {
   const updated = await deleteCachedRecord(table, groupId, recordId);
 
   const session = await getCurrentSession();
-  const isRemoteGroup = isSupabaseConfigured && session && groupId !== DEMO_GROUP_ID;
+  const isRemoteGroup =
+    isSupabaseConfigured && session && !session.isLocal && groupId !== DEMO_GROUP_ID;
 
   if (isRemoteGroup) {
     await enqueueOutboxMutation({
@@ -240,8 +247,15 @@ export async function deleteEntityOfflineFirst({ table, groupId, recordId }) {
 export async function saveGroupProfileOfflineFirst(profile) {
   const saved = await saveGroupProfile(profile);
   const session = await getCurrentSession();
+  if (session?.isLocal || !isSupabaseConfigured) {
+    updateLocalGroupRecord(saved);
+  }
   const isRemoteGroup =
-    isSupabaseConfigured && session && saved.id && saved.id !== DEMO_GROUP_ID;
+    isSupabaseConfigured &&
+    session &&
+    !session.isLocal &&
+    saved.id &&
+    saved.id !== DEMO_GROUP_ID;
 
   if (isRemoteGroup) {
     await enqueueOutboxMutation({
@@ -458,8 +472,13 @@ async function resolveFromMembershipList(list, preferredGroupId) {
 }
 
 export async function resolveUserActiveGroup(session, preferredGroupId = null) {
-  if (!isSupabaseConfigured || !supabase || !session?.user?.id) {
+  if (!session?.user?.id) {
     return null;
+  }
+
+  if (!isSupabaseConfigured || !supabase || session?.isLocal) {
+    const localItems = listLocalUserMemberships(session.user.id);
+    return resolveFromMembershipList(localItems, preferredGroupId);
   }
 
   const readCachedFallback = async () => {

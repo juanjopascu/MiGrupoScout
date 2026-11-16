@@ -24,6 +24,18 @@ import {
   isValidHexColor
 } from '../src/domain/branding.js';
 import { parseMembersCsv } from '../src/domain/memberCsvParser.js';
+import {
+  acceptLocalInvitation,
+  createLocalGroupTenant,
+  createLocalInvitation,
+  getLocalSession,
+  listLocalGroupTeam,
+  listLocalUserMemberships,
+  previewLocalInvitation,
+  signInLocalUser,
+  signOutLocalUser,
+  signUpLocalUser
+} from '../src/services/localAuthStore.js';
 
 describe('roles - matriz de permisos multi-tenant', () => {
   it('define los 4 roles canonicos y etiquetas institucionales sin emojis', () => {
@@ -221,5 +233,75 @@ describe('branding - logo y colores institucionales del Grupo', () => {
     expect(isSafeLogoValue('javascript:alert(1)')).toBe(false);
     expect(isSafeLogoValue('http://insecure.example/logo.png')).toBe(false);
     expect(isSafeLogoValue('data:image/png;base64,' + 'A'.repeat(200005))).toBe(false);
+  });
+});
+
+describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () => {
+  it('permite crear cuenta, generar tenant como Jefe de Grupo, emitir invitacion y unir a un Educador', async () => {
+    const signupJefe = await signUpLocalUser(
+      'jefe412@gruposcout.org.ar',
+      'claveSegura123',
+      'Martin Chief'
+    );
+    expect(signupJefe.error).toBeNull();
+    expect(signupJefe.session?.user?.id).toBeDefined();
+    expect(getLocalSession()?.user?.email).toBe('jefe412@gruposcout.org.ar');
+
+    const tenantRes = createLocalGroupTenant({
+      number: 412,
+      name: 'Grupo Scout 412 San Martin',
+      district: 'Distrito 2',
+      zone: 'Zona 14',
+      org_model: 'tradicional'
+    });
+    expect(tenantRes.ok).toBe(true);
+    expect(tenantRes.role).toBe('jefe_grupo');
+
+    const inviteRes = createLocalInvitation(
+      {
+        groupId: tenantRes.group.id,
+        role: 'educador',
+        branch: 'manada',
+        maxUses: 5,
+        expiresDays: 14
+      },
+      'jefe_grupo'
+    );
+    expect(inviteRes.ok).toBe(true);
+    expect(inviteRes.invitation.invite_code).toMatch(/^CS-/);
+
+    signOutLocalUser();
+    expect(getLocalSession()).toBeNull();
+
+    const signupEducador = await signUpLocalUser(
+      'educador1@gruposcout.org.ar',
+      'claveSegura456',
+      'Laura Educadora'
+    );
+    expect(signupEducador.error).toBeNull();
+
+    const preview = previewLocalInvitation(inviteRes.invitation.invite_code);
+    expect(preview.valid).toBe(true);
+    expect(preview.role).toBe('educador');
+    expect(preview.branch).toBe('manada');
+
+    const accepted = acceptLocalInvitation(inviteRes.invitation.invite_code, 'Laura Educadora');
+    expect(accepted.ok).toBe(true);
+    expect(accepted.groupId).toBe(tenantRes.group.id);
+    expect(accepted.role).toBe('educador');
+
+    const memberships = listLocalUserMemberships(signupEducador.session.user.id);
+    expect(memberships).toHaveLength(1);
+    expect(memberships[0].role).toBe('educador');
+
+    const team = listLocalGroupTeam(tenantRes.group.id);
+    expect(team).toHaveLength(2);
+
+    const wrongLogin = await signInLocalUser('educador1@gruposcout.org.ar', 'claveIncorrecta');
+    expect(wrongLogin.error).not.toBeNull();
+
+    const validLogin = await signInLocalUser('educador1@gruposcout.org.ar', 'claveSegura456');
+    expect(validLogin.error).toBeNull();
+    expect(validLogin.session?.user?.email).toBe('educador1@gruposcout.org.ar');
   });
 });

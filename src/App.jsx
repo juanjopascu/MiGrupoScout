@@ -142,7 +142,7 @@ export default function App() {
         let nextMemberships = [];
         let activeRemote = false;
 
-        if (activeSession && isSupabaseConfigured) {
+        if (activeSession) {
           const resolved = await resolveUserActiveGroup(activeSession, preferredGroupId);
           nextMemberships = resolved?.memberships || [];
           if (resolved?.groupId) {
@@ -158,12 +158,19 @@ export default function App() {
         }
 
         setMemberships(nextMemberships);
-        setHasActiveGroup(!activeSession || !isSupabaseConfigured || activeRemote);
+        setHasActiveGroup(!activeSession || activeRemote);
         setUserRole(nextRole);
         setGroupId(targetGroupId);
         await loadGroupStateFromCache(targetGroupId);
 
-        if (activeSession && targetGroupId !== DEMO_GROUP_ID && navigator.onLine && !isManualOfflineMode()) {
+        if (
+          activeSession &&
+          !activeSession.isLocal &&
+          isSupabaseConfigured &&
+          targetGroupId !== DEMO_GROUP_ID &&
+          navigator.onLine &&
+          !isManualOfflineMode()
+        ) {
           await syncPendingMutations();
           const remote = await pullRemoteSnapshot(targetGroupId);
           if (remote) {
@@ -416,10 +423,18 @@ export default function App() {
       setManualOfflineMode(false);
     }
 
-    if (!session || !isSupabaseConfigured || groupId === DEMO_GROUP_ID) {
+    if (!session || groupId === DEMO_GROUP_ID) {
       setSyncFeedback({
         type: 'success',
-        text: 'Datos locales verificados. Inicia sesion con tu cuenta de Grupo para sincronizar en la nube.'
+        text: 'Datos locales verificados. Inicia sesion con tu cuenta de Grupo para sincronizar.'
+      });
+      return;
+    }
+
+    if (session.isLocal || !isSupabaseConfigured) {
+      setSyncFeedback({
+        type: 'success',
+        text: 'Cambios guardados y consolidados en este dispositivo (modo local dual).'
       });
       return;
     }
@@ -458,7 +473,7 @@ export default function App() {
   }
 
   const effectiveIsOnline = isOnline && !manualOffline;
-  const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
+  const isDemoMode = !session || !hasActiveGroup;
   const shouldShowAuthScreen =
     !isLoadingData && !demoBypass && (!session || !hasActiveGroup);
 

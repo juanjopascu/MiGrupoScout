@@ -242,12 +242,9 @@ export default function AuthTenantPanel({
         </div>
 
         {!isSupabaseConfigured && (
-          <div className="p-3 rounded-xl border border-slate-300 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] text-xs space-y-1">
-            <p className="font-semibold">Modo nube en espera de vinculacion</p>
-            <p className="text-slate-700">
-              Para usar cuentas reales por Grupo Scout se requiere conectar Supabase en este dominio. Podes ingresar ahora al Modo Demo Local desde el boton inferior.
-            </p>
-          </div>
+          <p className="text-xs text-slate-600">
+            Almacenamiento local listo: podes crear tu cuenta, dar de alta tu Grupo e invitar dirigentes directamente desde este dispositivo.
+          </p>
         )}
 
         {inviteCode && (
