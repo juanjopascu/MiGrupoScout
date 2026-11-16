@@ -33,10 +33,12 @@ import {
   batchSaveMembersOfflineFirst,
   deleteEntityOfflineFirst,
   initAutoSync,
+  isManualOfflineMode,
   pullRemoteSnapshot,
   resolveUserActiveGroup,
   saveEntityOfflineFirst,
   saveGroupProfileOfflineFirst,
+  setManualOfflineMode,
   subscribeSyncStatus,
   syncPendingMutations
 } from './services/syncEngine.js';
@@ -67,6 +69,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+  const [manualOffline, setManualOffline] = useState(() => isManualOfflineMode());
+  const [syncFeedback, setSyncFeedback] = useState(null);
   const [session, setSession] = useState(null);
   const [demoBypass, setDemoBypass] = useState(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('invite')) {
@@ -159,7 +163,7 @@ export default function App() {
         setGroupId(targetGroupId);
         await loadGroupStateFromCache(targetGroupId);
 
-        if (activeSession && targetGroupId !== DEMO_GROUP_ID && navigator.onLine) {
+        if (activeSession && targetGroupId !== DEMO_GROUP_ID && navigator.onLine && !isManualOfflineMode()) {
           await syncPendingMutations();
           const remote = await pullRemoteSnapshot(targetGroupId);
           if (remote) {
@@ -366,6 +370,8 @@ export default function App() {
     await clearAllOfflineData();
     setSession(null);
     setDemoBypass(false);
+    setManualOffline(false);
+    setSyncFeedback(null);
     setMemberships([]);
     setUserRole('jefe_grupo');
     setHasActiveGroup(true);
@@ -375,16 +381,72 @@ export default function App() {
     await bootstrap();
   }
 
+  function handleToggleManualOffline() {
+    const next = !manualOffline;
+    setManualOffline(next);
+    setManualOfflineMode(next);
+    if (next) {
+      setSyncFeedback({
+        type: 'warning',
+        text: 'Modo sin conexion activado. Toda consulta o cambio quedara guardado en este dispositivo.'
+      });
+    } else if (isOnline) {
+      void handleManualSync();
+    } else {
+      setSyncFeedback({
+        type: 'warning',
+        text: 'El dispositivo sigue sin senal de internet. Los datos siguen accesibles en local.'
+      });
+    }
+  }
+
   async function handleManualSync() {
-    await syncPendingMutations();
-    if (groupId !== DEMO_GROUP_ID) {
-      const remote = await pullRemoteSnapshot(groupId);
-      if (remote) {
-        setGroupProfile(remote.groupProfile);
-        setMembers(remote.members);
-        setCamps(remote.camps);
-        setTasks(remote.tasks);
-      }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSyncFeedback({
+        type: 'warning',
+        text: 'Seguís sin conexion a internet. Tus cambios permanecen guardados en el dispositivo.'
+      });
+      return;
+    }
+
+    if (manualOffline) {
+      setManualOffline(false);
+      setManualOfflineMode(false);
+    }
+
+    if (!session || !isSupabaseConfigured || groupId === DEMO_GROUP_ID) {
+      setSyncFeedback({
+        type: 'success',
+        text: 'Datos locales verificados. Inicia sesion con tu cuenta de Grupo para sincronizar en la nube.'
+      });
+      return;
+    }
+
+    const syncResult = await syncPendingMutations({ ignoreManualOffline: true });
+    const remote = await pullRemoteSnapshot(groupId);
+    if (remote) {
+      setGroupProfile(remote.groupProfile);
+      setMembers(remote.members);
+      setCamps(remote.camps);
+      setTasks(remote.tasks);
+    }
+
+    const applied = syncResult?.syncedCount || 0;
+    if (syncResult?.conflictCount > 0) {
+      setSyncFeedback({
+        type: 'warning',
+        text: `Sincronizacion parcial: ${applied} cambios aplicados y ${syncResult.conflictCount} conflicto(s) pendiente(s).`
+      });
+    } else if (applied > 0) {
+      setSyncFeedback({
+        type: 'success',
+        text: `Sincronizacion completa: se aplicaron ${applied} cambio(s) y se actualizo el Grupo.`
+      });
+    } else {
+      setSyncFeedback({
+        type: 'success',
+        text: 'Todo sincronizado y actualizado con la nube.'
+      });
     }
   }
 
@@ -393,6 +455,7 @@ export default function App() {
     setNeedRefresh(false);
   }
 
+  const effectiveIsOnline = isOnline && !manualOffline;
   const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
   const shouldShowAuthScreen =
     !isLoadingData && !demoBypass && (!session || !hasActiveGroup);
@@ -402,6 +465,7 @@ export default function App() {
       <ErrorBoundary>
         <AuthScreen
           session={session}
+          isOnline={effectiveIsOnline}
           pendingInviteCode={pendingInviteCode}
           hasActiveGroup={hasActiveGroup}
           onAuthChanged={handleAuthChanged}
@@ -422,7 +486,13 @@ export default function App() {
         userRole={userRole}
         isDemoMode={isDemoMode}
         isAuthenticated={Boolean(session)}
-        isOnline={isOnline}
+        isOnline={effectiveIsOnline}
+        networkOnline={isOnline}
+        manualOffline={manualOffline}
+        onToggleManualOffline={handleToggleManualOffline}
+        onManualSync={handleManualSync}
+        syncFeedback={syncFeedback}
+        onDismissSyncFeedback={() => setSyncFeedback(null)}
         pushState={pushState}
         onOpenPushManager={() => setPushModalOpen(true)}
         onOpenTeamManager={() => setTeamModalOpen(true)}
@@ -472,7 +542,7 @@ export default function App() {
 
             {activeTab === 'normativa' && (
               <NormativaChat
-                isOnline={isOnline}
+                isOnline={effectiveIsOnline}
                 onNavigateToCampPlanner={() => handleSelectTab('campamentos')}
                 onNavigateToDocGenerator={() => handleSelectTab('documentos')}
               />
@@ -547,7 +617,10 @@ export default function App() {
         onLogout={handleLogout}
         syncState={syncState}
         onManualSync={handleManualSync}
-        isOnline={isOnline}
+        isOnline={effectiveIsOnline}
+        networkOnline={isOnline}
+        manualOffline={manualOffline}
+        onToggleManualOffline={handleToggleManualOffline}
       />
     </ErrorBoundary>
   );

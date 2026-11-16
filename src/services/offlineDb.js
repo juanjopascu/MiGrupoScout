@@ -15,7 +15,9 @@ export const LS_KEYS = Object.freeze({
   CAMP_ALERTS: 'consejoscout:scheduled_camp_alerts',
   DEMO_INITIALIZED: 'consejoscout:demo_initialized',
   PENDING_INVITE_CODE: 'consejoscout:pending_invite_code',
-  DEMO_BYPASS: 'consejoscout:demo_bypass'
+  DEMO_BYPASS: 'consejoscout:demo_bypass',
+  MANUAL_OFFLINE: 'consejoscout:manual_offline',
+  CACHED_MEMBERSHIPS: 'consejoscout:cached_memberships'
 });
 
 let dbPromise = null;
@@ -584,4 +586,6 @@ export async function clearAllOfflineData() {
   writeLocalPref(LS_KEYS.CAMP_ALERTS, null);
   writeLocalPref(LS_KEYS.DEMO_INITIALIZED, null);
   writeLocalPref(LS_KEYS.DEMO_BYPASS, null);
+  writeLocalPref(LS_KEYS.MANUAL_OFFLINE, null);
+  writeLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, null);
 }

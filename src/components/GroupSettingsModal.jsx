@@ -8,6 +8,8 @@ import {
   RefreshCw,
   Shield,
   Users,
+  Wifi,
+  WifiOff,
   X
 } from 'lucide-react';
 import {
@@ -44,7 +46,10 @@ export default function GroupSettingsModal({
   onLogout,
   syncState,
   onManualSync,
-  isOnline
+  isOnline,
+  networkOnline = true,
+  manualOffline = false,
+  onToggleManualOffline
 }) {
   const [number, setNumber] = useState(String(groupProfile?.number || 412));
   const [name, setName] = useState(groupProfile?.name || '');
@@ -204,7 +209,11 @@ export default function GroupSettingsModal({
                     : 'bg-amber-100 border-amber-700 text-amber-900'
                 }`}
               >
-                {isOnline ? 'En linea' : 'Sin conexion'}
+                {!networkOnline
+                  ? 'Sin internet'
+                  : manualOffline
+                    ? 'Offline manual'
+                    : 'En linea'}
               </span>
             </div>
 
@@ -244,6 +253,51 @@ export default function GroupSettingsModal({
               )}
             </div>
 
+            <div className="flex flex-wrap gap-2 pt-1">
+              {onToggleManualOffline && (
+                <button
+                  type="button"
+                  onClick={onToggleManualOffline}
+                  aria-pressed={manualOffline}
+                  className={`h-11 px-4 inline-flex items-center gap-2 rounded-lg border text-sm font-semibold ${
+                    manualOffline
+                      ? 'border-amber-700 bg-amber-100 text-amber-900 hover:bg-amber-200'
+                      : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-100'
+                  }`}
+                >
+                  {manualOffline ? (
+                    <Wifi className="w-4 h-4" aria-hidden="true" />
+                  ) : (
+                    <WifiOff className="w-4 h-4" aria-hidden="true" />
+                  )}
+                  <span>
+                    {manualOffline ? 'Desactivar modo sin conexion' : 'Activar modo sin conexion'}
+                  </span>
+                </button>
+              )}
+
+              {onManualSync && (
+                <button
+                  type="button"
+                  onClick={onManualSync}
+                  disabled={syncState.isSyncing}
+                  className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${syncState.isSyncing ? 'animate-spin' : ''}`}
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {syncState.isSyncing
+                      ? 'Sincronizando...'
+                      : syncState.pendingCount > 0
+                        ? `Aplicar ${syncState.pendingCount} cambio(s)`
+                        : 'Sincronizar ahora'}
+                  </span>
+                </button>
+              )}
+            </div>
+
             {session && isSupabaseConfigured && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {hasActiveGroup && (
@@ -257,21 +311,6 @@ export default function GroupSettingsModal({
                   >
                     <Users className="w-4 h-4" aria-hidden="true" />
                     <span>Equipo e Invitaciones</span>
-                  </button>
-                )}
-
-                {hasActiveGroup && (
-                  <button
-                    type="button"
-                    onClick={onManualSync}
-                    disabled={!isOnline || syncState.isSyncing}
-                    className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold disabled:opacity-50"
-                  >
-                    <RefreshCw
-                      className={`w-4 h-4 ${syncState.isSyncing ? 'animate-spin' : ''}`}
-                      aria-hidden="true"
-                    />
-                    <span>Sincronizar</span>
                   </button>
                 )}
 

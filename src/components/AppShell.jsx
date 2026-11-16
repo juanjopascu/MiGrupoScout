@@ -1,8 +1,10 @@
 import {
+  AlertTriangle,
   Bell,
   BellOff,
   BellRing,
   BookOpenCheck,
+  CheckCircle2,
   FileText,
   LayoutDashboard,
   LogIn,
@@ -70,6 +72,12 @@ export default function AppShell({
   isDemoMode,
   isAuthenticated,
   isOnline,
+  networkOnline = true,
+  manualOffline = false,
+  onToggleManualOffline,
+  onManualSync,
+  syncFeedback,
+  onDismissSyncFeedback,
   pushState,
   onOpenPushManager,
   onOpenTeamManager,
@@ -145,23 +153,72 @@ export default function AppShell({
         </nav>
 
         <div className="p-3 border-t border-slate-200 space-y-2">
-          <div
-            className={`min-h-[40px] px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center lg:justify-start gap-2 ${
+          <button
+            type="button"
+            onClick={onToggleManualOffline}
+            aria-pressed={manualOffline}
+            title={
+              !networkOnline
+                ? 'Sin conexion a internet en el dispositivo'
+                : manualOffline
+                  ? 'Modo sin conexion activado manualmente (tocar para reconectar)'
+                  : 'En linea (tocar para trabajar en Modo sin conexion)'
+            }
+            className={`w-full min-h-[42px] px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center lg:justify-between gap-2 transition-colors ${
               isOnline
-                ? 'bg-green-100 border-green-700 text-green-900'
-                : 'bg-amber-100 border-amber-700 text-amber-900'
+                ? 'bg-green-100 border-green-700 text-green-900 hover:bg-green-200/70'
+                : 'bg-amber-100 border-amber-700 text-amber-900 hover:bg-amber-200/70'
             }`}
           >
-            {isOnline ? (
-              <Wifi className="w-4 h-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <WifiOff className="w-4 h-4 shrink-0" aria-hidden="true" />
-            )}
-            <span className="hidden lg:inline truncate">
-              {isOnline ? 'En linea' : 'Modo Offline'}
-              {syncState.pendingCount > 0 ? ` (${syncState.pendingCount} pend.)` : ''}
+            <span className="inline-flex items-center gap-2 min-w-0">
+              {isOnline ? (
+                <Wifi className="w-4 h-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <WifiOff className="w-4 h-4 shrink-0" aria-hidden="true" />
+              )}
+              <span className="hidden lg:inline truncate">
+                {!networkOnline
+                  ? 'Sin internet (Offline)'
+                  : manualOffline
+                    ? 'Modo sin conexion'
+                    : 'En linea'}
+              </span>
             </span>
-          </div>
+            {syncState.pendingCount > 0 && (
+              <span className="hidden lg:inline-flex px-1.5 py-0.5 rounded-full bg-white/80 text-[11px] font-mono">
+                {syncState.pendingCount}
+              </span>
+            )}
+          </button>
+
+          {onManualSync && (
+            <button
+              type="button"
+              onClick={onManualSync}
+              disabled={syncState.isSyncing}
+              aria-label="Sincronizar y aplicar cambios"
+              className={`w-full min-h-[44px] px-3 rounded-lg border flex items-center justify-center lg:justify-between gap-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
+                syncState.pendingCount > 0 && networkOnline
+                  ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)]'
+                  : 'border-[var(--brand-primary)] text-[var(--brand-primary)] bg-white hover:bg-[var(--brand-primary-soft)]'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2.5 min-w-0">
+                <RefreshCw
+                  className={`w-4 h-4 shrink-0 ${syncState.isSyncing ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                <span className="hidden lg:inline truncate">
+                  {syncState.isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+                </span>
+              </span>
+              {syncState.pendingCount > 0 && (
+                <span className="hidden lg:inline-flex px-2 py-0.5 rounded-full text-xs font-mono bg-amber-100 text-amber-900">
+                  {syncState.pendingCount}
+                </span>
+              )}
+            </button>
+          )}
 
           {!isAuthenticated && onOpenAuthScreen && (
             <button
@@ -231,10 +288,12 @@ export default function AppShell({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <span
-              role="status"
-              aria-label={isOnline ? 'Conexion activa' : 'Sin conexion a internet'}
-              title={isOnline ? 'En linea' : 'Sin conexion'}
+            <button
+              type="button"
+              onClick={onToggleManualOffline}
+              aria-pressed={manualOffline}
+              aria-label={isOnline ? 'Activar modo sin conexion' : 'Modo sin conexion activo'}
+              title={isOnline ? 'Tocar para activar Modo sin conexion' : 'Modo sin conexion activo'}
               className={`min-w-[36px] h-9 px-2 rounded-lg border inline-flex items-center justify-center gap-1 text-xs font-semibold ${
                 isOnline
                   ? 'bg-green-100 border-green-700 text-green-900'
@@ -246,7 +305,31 @@ export default function AppShell({
               ) : (
                 <WifiOff className="w-4 h-4" aria-hidden="true" />
               )}
-            </span>
+              <span className="hidden sm:inline">{isOnline ? 'En linea' : 'Offline'}</span>
+            </button>
+
+            {onManualSync && (
+              <button
+                type="button"
+                onClick={onManualSync}
+                disabled={syncState.isSyncing}
+                aria-label="Sincronizar cambios"
+                title="Sincronizar cambios"
+                className={`relative min-w-[40px] h-9 px-2.5 rounded-lg border inline-flex items-center justify-center gap-1 text-xs font-semibold disabled:opacity-60 ${
+                  syncState.pendingCount > 0 && networkOnline
+                    ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white'
+                    : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
+                }`}
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${syncState.isSyncing ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                {syncState.pendingCount > 0 && (
+                  <span className="font-mono text-[11px]">{syncState.pendingCount}</span>
+                )}
+              </button>
+            )}
 
             {!isAuthenticated && onOpenAuthScreen && (
               <button
@@ -319,6 +402,95 @@ export default function AppShell({
             >
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Modo sin conexion / Cambios pendientes / Sincronizacion */}
+      {(!isOnline || syncState.pendingCount > 0 || syncFeedback) && (
+        <div className="md:ml-20 lg:ml-64 px-4 pt-3">
+          <div className="max-w-7xl mx-auto space-y-2">
+            {(!isOnline || syncState.pendingCount > 0) && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 text-xs sm:text-sm ${
+                  !isOnline
+                    ? 'bg-amber-50 border-amber-700 text-amber-950'
+                    : 'bg-[var(--brand-primary-soft)] border-[var(--brand-primary)] text-slate-900'
+                }`}
+              >
+                <div className="flex items-start sm:items-center gap-2">
+                  {!isOnline ? (
+                    <WifiOff className="w-4 h-4 text-amber-800 shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
+                  )}
+                  <span>
+                    {!isOnline
+                      ? `Modo sin conexion activo: podes consultar toda la informacion del Grupo.${
+                          syncState.pendingCount > 0
+                            ? ` Tenes ${syncState.pendingCount} cambio(s) guardados localmente para aplicar al reconectarte.`
+                            : ' Cualquier cambio se guardara localmente para sincronizar luego.'
+                        }`
+                      : `Conexion activa con ${syncState.pendingCount} cambio(s) pendiente(s) por aplicar en la nube.`}
+                  </span>
+                </div>
+
+                {onManualSync && networkOnline && (syncState.pendingCount > 0 || manualOffline) && (
+                  <button
+                    type="button"
+                    onClick={onManualSync}
+                    disabled={syncState.isSyncing}
+                    className="h-9 px-3.5 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-60"
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 ${syncState.isSyncing ? 'animate-spin' : ''}`}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      {syncState.isSyncing
+                        ? 'Sincronizando...'
+                        : syncState.pendingCount > 0
+                          ? 'Aplicar cambios ahora'
+                          : 'Salir de offline y sincronizar'}
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {syncFeedback && (
+              <div
+                role="status"
+                className={`p-3 rounded-xl border text-xs sm:text-sm flex items-center justify-between gap-2 ${
+                  syncFeedback.type === 'success'
+                    ? 'bg-green-100 border-green-700 text-green-900'
+                    : syncFeedback.type === 'warning'
+                      ? 'bg-amber-100 border-amber-700 text-amber-900'
+                      : 'bg-red-100 border-red-700 text-red-900'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {syncFeedback.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  )}
+                  <span>{syncFeedback.text}</span>
+                </div>
+                {onDismissSyncFeedback && (
+                  <button
+                    type="button"
+                    onClick={onDismissSyncFeedback}
+                    aria-label="Cerrar aviso de sincronizacion"
+                    className="min-w-[32px] min-h-[32px] inline-flex items-center justify-center rounded-lg hover:bg-black/5"
+                  >
+                    <X className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -21,6 +21,24 @@ const syncListeners = new Set();
 let isSyncRunning = false;
 let autoSyncInitialized = false;
 
+export function isManualOfflineMode() {
+  return Boolean(readLocalPref(LS_KEYS.MANUAL_OFFLINE, false));
+}
+
+export function setManualOfflineMode(enabled) {
+  writeLocalPref(LS_KEYS.MANUAL_OFFLINE, Boolean(enabled));
+  void emitSyncState();
+  return Boolean(enabled);
+}
+
+function canAutoSyncNow() {
+  return (
+    typeof navigator !== 'undefined' &&
+    navigator.onLine &&
+    !isManualOfflineMode()
+  );
+}
+
 async function emitSyncState(extra = {}) {
   const queue = await getOutboxQueue();
   const state = {
@@ -130,7 +148,7 @@ export async function saveEntityOfflineFirst({ table, groupId, record, isNewHint
       payload: toDbPayload(table, savedRecord)
     });
     await emitSyncState();
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
+    if (canAutoSyncNow()) {
       void syncPendingMutations();
     }
   }
@@ -157,7 +175,7 @@ export async function batchSaveMembersOfflineFirst({ groupId, records = [] }) {
 
   if (isRemoteGroup) {
     const payloads = savedRecords.map((item) => toDbPayload('group_members', item));
-    if (typeof navigator !== 'undefined' && navigator.onLine && supabase) {
+    if (canAutoSyncNow() && supabase) {
       let failedChunks = false;
       for (let i = 0; i < payloads.length; i += 100) {
         const chunk = payloads.slice(i, i + 100);
@@ -211,7 +229,7 @@ export async function deleteEntityOfflineFirst({ table, groupId, recordId }) {
       payload: { id: recordId, group_id: groupId }
     });
     await emitSyncState();
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
+    if (canAutoSyncNow()) {
       void syncPendingMutations();
     }
   }
@@ -233,7 +251,7 @@ export async function saveGroupProfileOfflineFirst(profile) {
       payload: toDbPayload('scout_groups', saved)
     });
     await emitSyncState();
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
+    if (canAutoSyncNow()) {
       void syncPendingMutations();
     }
   }
@@ -241,20 +259,24 @@ export async function saveGroupProfileOfflineFirst(profile) {
   return saved;
 }
 
-export async function syncPendingMutations() {
+export async function syncPendingMutations({ ignoreManualOffline = false } = {}) {
   if (isSyncRunning || !isSupabaseConfigured || !supabase) {
-    return emitSyncState();
+    return { ...(await emitSyncState()), syncedCount: 0 };
+  }
+  if (!ignoreManualOffline && isManualOfflineMode()) {
+    return { ...(await emitSyncState()), syncedCount: 0 };
   }
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return emitSyncState();
+    return { ...(await emitSyncState()), syncedCount: 0 };
   }
 
   const session = await getCurrentSession();
   if (!session) {
-    return emitSyncState();
+    return { ...(await emitSyncState()), syncedCount: 0 };
   }
 
   isSyncRunning = true;
+  let syncedCount = 0;
   await emitSyncState({ error: null });
 
   try {
@@ -307,6 +329,7 @@ export async function syncPendingMutations() {
         }
 
         await removeOutboxItem(item.localId);
+        syncedCount += 1;
       } catch (err) {
         await updateOutboxItem({
           ...item,
@@ -318,7 +341,8 @@ export async function syncPendingMutations() {
 
     const syncedAt = new Date().toISOString();
     writeLocalPref(LS_KEYS.LAST_SYNC_AT, syncedAt);
-    return await emitSyncState({ lastSyncAt: syncedAt, error: null });
+    const nextState = await emitSyncState({ lastSyncAt: syncedAt, error: null });
+    return { ...nextState, syncedCount };
   } finally {
     isSyncRunning = false;
     await emitSyncState();
@@ -400,9 +424,54 @@ export async function pullRemoteSnapshot(groupId) {
   };
 }
 
+async function resolveFromMembershipList(list, preferredGroupId) {
+  if (!Array.isArray(list) || list.length === 0) {
+    return {
+      groupId: null,
+      role: null,
+      branch: null,
+      group: null,
+      memberships: []
+    };
+  }
+
+  const storedGroupId = preferredGroupId || readLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
+  const activeMembership =
+    list.find((m) => m.group_id === storedGroupId) || list[0];
+
+  if (activeMembership.scout_groups) {
+    await saveGroupProfile({
+      ...activeMembership.scout_groups,
+      userRole: activeMembership.role,
+      userBranch: activeMembership.branch || 'jefatura',
+      userDisplayName: activeMembership.display_name || null
+    });
+  }
+  writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, activeMembership.group_id);
+  return {
+    groupId: activeMembership.group_id,
+    role: activeMembership.role,
+    branch: activeMembership.branch || 'jefatura',
+    group: activeMembership.scout_groups || null,
+    memberships: list
+  };
+}
+
 export async function resolveUserActiveGroup(session, preferredGroupId = null) {
   if (!isSupabaseConfigured || !supabase || !session?.user?.id) {
     return null;
+  }
+
+  const readCachedFallback = async () => {
+    const cached = readLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, null);
+    if (cached && cached.userId === session.user.id && Array.isArray(cached.items)) {
+      return resolveFromMembershipList(cached.items, preferredGroupId);
+    }
+    return null;
+  };
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return readCachedFallback();
   }
 
   try {
@@ -413,7 +482,11 @@ export async function resolveUserActiveGroup(session, preferredGroupId = null) {
       .eq('is_active', true)
       .order('created_at', { ascending: true });
 
-    if (error || !Array.isArray(data) || data.length === 0) {
+    if (error) {
+      const fallback = await readCachedFallback();
+      if (fallback) {
+        return fallback;
+      }
       return {
         groupId: null,
         role: null,
@@ -423,28 +496,15 @@ export async function resolveUserActiveGroup(session, preferredGroupId = null) {
       };
     }
 
-    const storedGroupId = preferredGroupId || readLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
-    const activeMembership =
-      data.find((m) => m.group_id === storedGroupId) || data[0];
+    const items = Array.isArray(data) ? data : [];
+    writeLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, {
+      userId: session.user.id,
+      items
+    });
 
-    if (activeMembership.scout_groups) {
-      await saveGroupProfile({
-        ...activeMembership.scout_groups,
-        userRole: activeMembership.role,
-        userBranch: activeMembership.branch || 'jefatura',
-        userDisplayName: activeMembership.display_name || null
-      });
-    }
-    writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, activeMembership.group_id);
-    return {
-      groupId: activeMembership.group_id,
-      role: activeMembership.role,
-      branch: activeMembership.branch || 'jefatura',
-      group: activeMembership.scout_groups || null,
-      memberships: data
-    };
+    return resolveFromMembershipList(items, preferredGroupId);
   } catch {
-    return null;
+    return readCachedFallback();
   }
 }
 
@@ -455,11 +515,13 @@ export function initAutoSync() {
   autoSyncInitialized = true;
 
   window.addEventListener('online', () => {
-    void syncPendingMutations();
+    if (!isManualOfflineMode()) {
+      void syncPendingMutations();
+    }
   });
 
   window.addEventListener('focus', () => {
-    if (navigator.onLine) {
+    if (navigator.onLine && !isManualOfflineMode()) {
       void syncPendingMutations();
     }
   });

@@ -1,9 +1,10 @@
-import { Compass } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import AuthTenantPanel from './AuthTenantPanel.jsx';
 import FleurDeLisIcon from './FleurDeLisIcon.jsx';
 
 export default function AuthScreen({
   session,
+  isOnline = true,
   pendingInviteCode,
   hasActiveGroup,
   onAuthChanged,
@@ -24,6 +25,12 @@ export default function AuthScreen({
           <p className="text-sm text-slate-700">
             Gestion multi-grupo para Jefes de Grupo, Subjefes, Jefes de Rama y Educadores SAAC.
           </p>
+          {!isOnline && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-700 bg-amber-100 text-amber-900 text-xs font-semibold">
+              <WifiOff className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Sin conexion a internet: modo local disponible</span>
+            </div>
+          )}
         </div>
 
         <div className="bg-white border border-slate-300 rounded-2xl shadow-sm p-5 sm:p-6 space-y-5">
@@ -42,8 +49,8 @@ export default function AuthScreen({
                 onClick={onContinueDemo}
                 className="w-full h-11 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
               >
-                <Compass className="w-4 h-4 text-[var(--brand-primary)]" aria-hidden="true" />
-                <span>Explorar en Modo Demo Local (sin cuenta)</span>
+                <WifiOff className="w-4 h-4 text-[var(--brand-primary)]" aria-hidden="true" />
+                <span>Entrar en Modo Sin Conexion / Demo Local</span>
               </button>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2">
@@ -52,7 +59,7 @@ export default function AuthScreen({
                   onClick={onContinueDemo}
                   className="flex-1 h-10 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold"
                 >
-                  Ver Modo Demo
+                  Entrar en Modo Sin Conexion
                 </button>
                 <button
                   type="button"
