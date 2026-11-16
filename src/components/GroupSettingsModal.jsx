@@ -10,10 +10,21 @@ import {
   Users,
   X
 } from 'lucide-react';
-import { canEditGroupSettings, getRoleLabel } from '../domain/roles.js';
+import {
+  DEFAULT_BRANDING,
+  isSafeLogoValue,
+  isValidHexColor,
+  normalizeHexColor
+} from '../domain/branding.js';
+import {
+  canEditGroupBranding,
+  canEditGroupSettings,
+  getRoleLabel
+} from '../domain/roles.js';
 import { isSupabaseConfigured } from '../services/supabaseClient.js';
 import { cleanUserText, formatDateAr } from '../utils/textSanitizer.js';
 import AuthTenantPanel from './AuthTenantPanel.jsx';
+import GroupBrandingFields from './GroupBrandingFields.jsx';
 
 export default function GroupSettingsModal({
   isOpen,
@@ -40,10 +51,18 @@ export default function GroupSettingsModal({
   const [district, setDistrict] = useState(groupProfile?.district || '');
   const [zone, setZone] = useState(groupProfile?.zone || '');
   const [orgModel, setOrgModel] = useState(groupProfile?.org_model || 'tradicional');
+  const [primaryColor, setPrimaryColor] = useState(
+    groupProfile?.primary_color || DEFAULT_BRANDING.primaryColor
+  );
+  const [accentColor, setAccentColor] = useState(
+    groupProfile?.accent_color || DEFAULT_BRANDING.accentColor
+  );
+  const [logoUrl, setLogoUrl] = useState(groupProfile?.logo_url || null);
   const [saveMessage, setSaveMessage] = useState(null);
 
   const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
   const canEditGroup = isDemoMode || canEditGroupSettings(userRole);
+  const canEditBranding = isDemoMode || canEditGroupBranding(userRole);
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,6 +73,9 @@ export default function GroupSettingsModal({
     setDistrict(groupProfile?.district || '');
     setZone(groupProfile?.zone || '');
     setOrgModel(groupProfile?.org_model || 'tradicional');
+    setPrimaryColor(groupProfile?.primary_color || DEFAULT_BRANDING.primaryColor);
+    setAccentColor(groupProfile?.accent_color || DEFAULT_BRANDING.accentColor);
+    setLogoUrl(groupProfile?.logo_url || null);
     setSaveMessage(null);
 
     const onKeyDown = (event) => {
@@ -87,18 +109,41 @@ export default function GroupSettingsModal({
       return;
     }
 
+    if (!isValidHexColor(primaryColor) || !isValidHexColor(accentColor)) {
+      setSaveMessage({
+        type: 'error',
+        text: 'Los colores institucionales deben tener formato hexadecimal valido (#RRGGBB).'
+      });
+      return;
+    }
+
+    if (!isSafeLogoValue(logoUrl)) {
+      setSaveMessage({
+        type: 'error',
+        text: 'El formato del logo no es valido.'
+      });
+      return;
+    }
+
     await onSaveGroupProfile({
       ...groupProfile,
       number: parsedNum,
       name: cleanedName,
       district: cleanedDistrict,
       zone: cleanedZone,
-      org_model: orgModel
+      org_model: orgModel,
+      primary_color: canEditBranding
+        ? normalizeHexColor(primaryColor, DEFAULT_BRANDING.primaryColor)
+        : groupProfile?.primary_color || DEFAULT_BRANDING.primaryColor,
+      accent_color: canEditBranding
+        ? normalizeHexColor(accentColor, DEFAULT_BRANDING.accentColor)
+        : groupProfile?.accent_color || DEFAULT_BRANDING.accentColor,
+      logo_url: canEditBranding ? logoUrl || null : groupProfile?.logo_url || null
     });
 
     setSaveMessage({
       type: 'success',
-      text: 'Datos del Grupo guardados localmente y listos para sincronizar.'
+      text: 'Datos e identidad del Grupo guardados localmente y listos para sincronizar.'
     });
   }
 
@@ -343,6 +388,18 @@ export default function GroupSettingsModal({
                   </select>
                 </div>
               </div>
+
+              <GroupBrandingFields
+                groupName={name}
+                groupNumber={number}
+                primaryColor={primaryColor}
+                accentColor={accentColor}
+                logoUrl={logoUrl}
+                disabled={!canEditBranding}
+                onChangePrimaryColor={setPrimaryColor}
+                onChangeAccentColor={setAccentColor}
+                onChangeLogoUrl={setLogoUrl}
+              />
 
               {saveMessage && (
                 <div

@@ -5,6 +5,7 @@ import {
   buildInvitationShareText,
   buildInvitationUrl,
   canDeleteRecords,
+  canEditGroupBranding,
   canEditGroupSettings,
   canEditMembers,
   canInviteTargetRole,
@@ -16,6 +17,12 @@ import {
   validateGroupTenantInput,
   validateInvitationInput
 } from '../src/domain/roles.js';
+import {
+  DEFAULT_BRANDING,
+  computeBrandTheme,
+  isSafeLogoValue,
+  isValidHexColor
+} from '../src/domain/branding.js';
 import { parseMembersCsv } from '../src/domain/memberCsvParser.js';
 
 describe('roles - matriz de permisos multi-tenant', () => {
@@ -33,6 +40,11 @@ describe('roles - matriz de permisos multi-tenant', () => {
     expect(canEditGroupSettings('subjefe_grupo')).toBe(true);
     expect(canEditGroupSettings('jefe_rama')).toBe(false);
     expect(canEditGroupSettings('educador')).toBe(false);
+
+    expect(canEditGroupBranding('jefe_grupo')).toBe(true);
+    expect(canEditGroupBranding('subjefe_grupo')).toBe(false);
+    expect(canEditGroupBranding('jefe_rama')).toBe(false);
+    expect(canEditGroupBranding('educador')).toBe(false);
 
     expect(canManageTeamRoles('jefe_grupo')).toBe(true);
     expect(canManageTeamRoles('subjefe_grupo')).toBe(false);
@@ -176,5 +188,38 @@ describe('memberCsvParser - carga masiva hasta 300 integrantes por grupo', () =>
     const parsed = parseMembersCsv(rows.join('\n'));
     expect(parsed.invalidRows).toHaveLength(0);
     expect(parsed.validRecords).toHaveLength(300);
+  });
+});
+
+describe('branding - logo y colores institucionales del Grupo', () => {
+  it('valida colores hexadecimales y calcula contraste WCAG seguro', () => {
+    expect(isValidHexColor('#1B365D')).toBe(true);
+    expect(isValidHexColor('#fff')).toBe(false);
+    expect(isValidHexColor('red')).toBe(false);
+
+    const darkTheme = computeBrandTheme('#1B365D', '#2E7D32');
+    expect(darkTheme.primary).toBe('#1B365D');
+    expect(darkTheme.primaryContrast).toBe('#FFFFFF');
+
+    const lightTheme = computeBrandTheme('#FACC15', '#1B365D');
+    expect(lightTheme.primaryContrast).toBe('#0F172A');
+
+    const fallbackTheme = computeBrandTheme('invalido', null);
+    expect(fallbackTheme.primary).toBe(DEFAULT_BRANDING.primaryColor);
+    expect(fallbackTheme.accent).toBe(DEFAULT_BRANDING.accentColor);
+  });
+
+  it('acepta data URLs PNG/JPG/WebP o HTTPS y rechaza SVG/XSS en logo_url', () => {
+    expect(isSafeLogoValue(null)).toBe(true);
+    expect(isSafeLogoValue('data:image/webp;base64,UklGRh4AAABXRUJQ')).toBe(true);
+    expect(isSafeLogoValue('data:image/png;base64,iVBORw0KGgo=')).toBe(true);
+    expect(isSafeLogoValue('https://abc.supabase.co/storage/v1/object/public/logos/g412.webp')).toBe(
+      true
+    );
+
+    expect(isSafeLogoValue('data:image/svg+xml;base64,PHN2Zz4=')).toBe(false);
+    expect(isSafeLogoValue('javascript:alert(1)')).toBe(false);
+    expect(isSafeLogoValue('http://insecure.example/logo.png')).toBe(false);
+    expect(isSafeLogoValue('data:image/png;base64,' + 'A'.repeat(200005))).toBe(false);
   });
 });

@@ -1,7 +1,13 @@
 import { useState } from 'react';
-import { ClipboardList, FileSpreadsheet, Plus, Users } from 'lucide-react';
+import { ClipboardList, FileSpreadsheet, Palette, Plus, Users } from 'lucide-react';
+import GroupLogoBadge from '../components/GroupLogoBadge.jsx';
 import MemberCsvImportModal from '../components/MemberCsvImportModal.jsx';
-import { canDeleteRecords, canEditMembers, getRoleLabel } from '../domain/roles.js';
+import {
+  canDeleteRecords,
+  canEditGroupBranding,
+  canEditMembers,
+  getRoleLabel
+} from '../domain/roles.js';
 import { cleanUserText } from '../utils/textSanitizer.js';
 import MemberListPanel from './dashboard/MemberListPanel.jsx';
 import MemberModal from './dashboard/MemberModal.jsx';
@@ -35,6 +41,7 @@ export default function Dashboard({
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const canEditNomina = isDemoMode || canEditMembers(userRole);
   const canDelete = isDemoMode || canDeleteRecords(userRole);
+  const canCustomizeBranding = isDemoMode || canEditGroupBranding(userRole);
   const {
     activeSegment,
     setActiveSegment,
@@ -74,18 +81,43 @@ export default function Dashboard({
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Tablero del Grupo
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold border border-[#1B365D] bg-[#EBF2FA] text-[#1B365D]">
-              {isDemoMode ? 'Demo Local' : getRoleLabel(userRole)}
-            </span>
+        <div className="flex items-start gap-3">
+          <GroupLogoBadge
+            logoUrl={groupProfile?.logo_url}
+            primaryColor={groupProfile?.primary_color}
+            sizeClass="w-12 h-12"
+            iconClass="w-6 h-6"
+          />
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Tablero del Grupo
+              </h1>
+              <span
+                className="px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+                style={{
+                  backgroundColor: 'var(--brand-primary-soft, #EBF2FA)',
+                  borderColor: 'var(--brand-primary, #1B365D)',
+                  color: 'var(--brand-primary-soft-text, #1B365D)'
+                }}
+              >
+                {isDemoMode ? 'Demo Local' : getRoleLabel(userRole)}
+              </span>
+              {canCustomizeBranding && onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 inline-flex items-center gap-1"
+                >
+                  <Palette className="w-3 h-3" aria-hidden="true" />
+                  <span>Logo y colores</span>
+                </button>
+              )}
+            </div>
+            <p className="text-sm text-slate-700 mt-0.5">
+              {cleanUserText(groupProfile?.name || 'Grupo Scout')} - {cleanUserText(groupProfile?.district || 'Distrito')} ({cleanUserText(groupProfile?.zone || 'Zona')})
+            </p>
           </div>
-          <p className="text-sm text-slate-700 mt-0.5">
-            {cleanUserText(groupProfile?.name || 'Grupo Scout')} - {cleanUserText(groupProfile?.district || 'Distrito')} ({cleanUserText(groupProfile?.zone || 'Zona')})
-          </p>
         </div>
         <div className="w-full lg:max-w-md space-y-2">
           <PushStatusWidget pushState={pushState} onOpen={onOpenPushManager} />

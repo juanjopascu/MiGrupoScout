@@ -103,7 +103,10 @@ function toDbPayload(table, record) {
       name: record.name,
       district: record.district,
       zone: record.zone,
-      org_model: record.org_model || 'tradicional'
+      org_model: record.org_model || 'tradicional',
+      primary_color: record.primary_color || '#1B365D',
+      accent_color: record.accent_color || '#2E7D32',
+      logo_url: record.logo_url || null
     };
   }
   return record;

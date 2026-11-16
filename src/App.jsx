@@ -6,6 +6,7 @@ import GroupSettingsModal from './components/GroupSettingsModal.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
 import PushNotificationManager from './components/PushNotificationManager.jsx';
 import TeamManagementModal from './components/TeamManagementModal.jsx';
+import { applyGroupBrandingToDocument } from './domain/branding.js';
 import { canDeleteRecords, normalizeInviteCode } from './domain/roles.js';
 import CampPlanner from './pages/CampPlanner.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -174,6 +175,10 @@ export default function App() {
     },
     [loadGroupStateFromCache]
   );
+
+  useEffect(() => {
+    applyGroupBrandingToDocument(groupProfile);
+  }, [groupProfile]);
 
   useEffect(() => {
     void bootstrap();

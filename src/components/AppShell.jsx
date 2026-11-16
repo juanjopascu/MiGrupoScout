@@ -8,7 +8,6 @@ import {
   LogIn,
   RefreshCw,
   Settings,
-  Shield,
   Tent,
   Users,
   Wifi,
@@ -16,6 +15,7 @@ import {
   X
 } from 'lucide-react';
 import { getRoleLabel } from '../domain/roles.js';
+import GroupLogoBadge from './GroupLogoBadge.jsx';
 
 export const NAV_ITEMS = Object.freeze([
   Object.freeze({
@@ -94,13 +94,19 @@ export default function AppShell({
         aria-label="Navegacion principal escritorio"
         className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-20 lg:w-64 bg-white border-r border-slate-300 z-30"
       >
-        <div className="px-4 py-4 border-b border-slate-200 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#1B365D] text-white inline-flex items-center justify-center shrink-0">
-            <Shield className="w-5 h-5" aria-hidden="true" />
-          </div>
+        <div
+          className="px-4 py-4 border-b border-slate-200 flex items-center gap-3"
+          style={{ borderTop: '3px solid var(--brand-accent, #2E7D32)' }}
+        >
+          <GroupLogoBadge
+            logoUrl={groupProfile?.logo_url}
+            primaryColor={groupProfile?.primary_color}
+            sizeClass="w-10 h-10"
+            iconClass="w-5 h-5"
+          />
           <div className="hidden lg:block min-w-0">
             <p className="text-base font-bold text-slate-900 leading-tight truncate">
-              ConsejoScout
+              {groupProfile?.name ? `Grupo ${groupProfile.number || ''}`.trim() : 'ConsejoScout'}
             </p>
             <p className="text-xs text-slate-600 truncate">{groupSubtitle}</p>
           </div>
@@ -117,9 +123,17 @@ export default function AppShell({
                 onClick={() => onSelectTab(item.id)}
                 aria-current={isActive ? 'page' : undefined}
                 title={item.label}
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: 'var(--brand-primary-soft, #EBF2FA)',
+                        color: 'var(--brand-primary-soft-text, #1B365D)'
+                      }
+                    : undefined
+                }
                 className={`w-full min-h-[48px] px-3 rounded-lg flex items-center justify-center lg:justify-start gap-3 text-sm transition-colors ${
                   isActive
-                    ? 'bg-[#EBF2FA] text-[#1B365D] font-semibold'
+                    ? 'font-semibold'
                     : 'text-slate-700 font-medium hover:bg-slate-100'
                 }`}
               >
@@ -196,12 +210,18 @@ export default function AppShell({
       </aside>
 
       {/* TopAppBar Mobile */}
-      <header className="md:hidden sticky top-0 z-30 bg-white border-b border-slate-300 pt-safe-top">
+      <header
+        className="md:hidden sticky top-0 z-30 bg-white border-b border-slate-300 pt-safe-top"
+        style={{ borderTop: '3px solid var(--brand-accent, #2E7D32)' }}
+      >
         <div className="h-14 px-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-[#1B365D] text-white inline-flex items-center justify-center shrink-0">
-              <Shield className="w-5 h-5" aria-hidden="true" />
-            </div>
+            <GroupLogoBadge
+              logoUrl={groupProfile?.logo_url}
+              primaryColor={groupProfile?.primary_color}
+              sizeClass="w-9 h-9"
+              iconClass="w-5 h-5"
+            />
             <div className="min-w-0">
               <p className="text-sm font-bold text-slate-900 leading-tight truncate">
                 {activeNav.title}
@@ -338,17 +358,28 @@ export default function AppShell({
                 className="min-h-[48px] flex flex-col items-center justify-center gap-0.5 px-1"
               >
                 <span
+                  style={
+                    isActive
+                      ? {
+                          backgroundColor: 'var(--brand-primary-soft, #EBF2FA)',
+                          color: 'var(--brand-primary-soft-text, #1B365D)'
+                        }
+                      : undefined
+                  }
                   className={`px-3.5 py-1 rounded-full transition-colors ${
-                    isActive ? 'bg-[#EBF2FA] text-[#1B365D]' : 'text-slate-600'
+                    isActive ? '' : 'text-slate-600'
                   }`}
                 >
                   <Icon className="w-5 h-5" aria-hidden="true" />
                 </span>
                 <span
-                  className={`text-[12px] leading-4 ${
+                  style={
                     isActive
-                      ? 'text-[#1B365D] font-semibold'
-                      : 'text-slate-600 font-medium'
+                      ? { color: 'var(--brand-primary-soft-text, #1B365D)' }
+                      : undefined
+                  }
+                  className={`text-[12px] leading-4 ${
+                    isActive ? 'font-semibold' : 'text-slate-600 font-medium'
                   }`}
                 >
                   {item.label}

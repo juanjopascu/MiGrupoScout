@@ -17,6 +17,22 @@ CREATE TABLE IF NOT EXISTS scout_groups (
   zone text NOT NULL,
   org_model text NOT NULL DEFAULT 'tradicional'
     CHECK (org_model IN ('tradicional', 'nucleo', 'comunitario', 'escolar')),
+  primary_color text NOT NULL DEFAULT '#1B365D'
+    CHECK (primary_color ~ '^#[0-9A-Fa-f]{6}$'),
+  accent_color text NOT NULL DEFAULT '#2E7D32'
+    CHECK (accent_color ~ '^#[0-9A-Fa-f]{6}$'),
+  logo_url text
+    CHECK (
+      logo_url IS NULL
+      OR (
+        char_length(logo_url) <= 200000
+        AND logo_url !~* '(svg\+xml|<script|javascript:)'
+        AND (
+          logo_url ~* '^data:image/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$'
+          OR logo_url ~* '^https://'
+        )
+      )
+    ),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -288,6 +304,43 @@ DROP TRIGGER IF EXISTS trg_scout_groups_updated_at ON scout_groups;
 CREATE TRIGGER trg_scout_groups_updated_at
   BEFORE UPDATE ON scout_groups
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE OR REPLACE FUNCTION guard_scout_groups_branding()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF current_user IN ('postgres', 'supabase_admin', 'service_role') THEN
+    RETURN NEW;
+  END IF;
+
+  IF (
+    NEW.primary_color IS DISTINCT FROM OLD.primary_color
+    OR NEW.accent_color IS DISTINCT FROM OLD.accent_color
+    OR NEW.logo_url IS DISTINCT FROM OLD.logo_url
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM group_memberships
+      WHERE group_id = NEW.id
+        AND user_id = auth.uid()
+        AND role = 'jefe_grupo'
+        AND is_active = true
+    ) THEN
+      RAISE EXCEPTION 'Solo el Jefe de Grupo puede modificar el logo y los colores institucionales';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_scout_groups_branding_guard ON scout_groups;
+CREATE TRIGGER trg_scout_groups_branding_guard
+  BEFORE UPDATE ON scout_groups
+  FOR EACH ROW EXECUTE FUNCTION guard_scout_groups_branding();
 
 DROP TRIGGER IF EXISTS trg_group_memberships_updated_at ON group_memberships;
 CREATE TRIGGER trg_group_memberships_updated_at
