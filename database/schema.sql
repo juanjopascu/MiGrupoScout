@@ -64,6 +64,35 @@ CREATE INDEX IF NOT EXISTS idx_group_memberships_group_active
 CREATE INDEX IF NOT EXISTS idx_group_memberships_user_active
   ON group_memberships (user_id, is_active);
 
+CREATE TABLE IF NOT EXISTS platform_admins (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  notes text NOT NULL DEFAULT 'Administrador global de plataforma',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Para habilitar un Administrador Global desde Supabase SQL Editor:
+-- INSERT INTO platform_admins (user_id, email)
+-- SELECT id, email FROM auth.users WHERE lower(email) = 'tu-correo@ejemplo.com'
+-- ON CONFLICT (user_id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION is_platform_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM platform_admins
+    WHERE user_id = auth.uid()
+  );
+$$;
+
+REVOKE ALL ON FUNCTION is_platform_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION is_platform_admin() TO authenticated, service_role;
+
 CREATE TABLE IF NOT EXISTS group_invitations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES scout_groups(id) ON DELETE CASCADE,
@@ -312,7 +341,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF current_user IN ('postgres', 'supabase_admin', 'service_role') THEN
+  IF current_user IN ('postgres', 'supabase_admin', 'service_role') OR is_platform_admin() THEN
     RETURN NEW;
   END IF;
 
@@ -362,7 +391,9 @@ DECLARE
   v_is_provisioning text := current_setting('app.tenant_provisioning', true);
   v_actor_is_jefe boolean;
 BEGIN
-  IF current_user IN ('postgres', 'supabase_admin', 'service_role') OR v_is_provisioning = 'true' THEN
+  IF current_user IN ('postgres', 'supabase_admin', 'service_role')
+    OR v_is_provisioning = 'true'
+    OR is_platform_admin() THEN
     RETURN COALESCE(NEW, OLD);
   END IF;
 
@@ -450,12 +481,15 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM group_memberships
-    WHERE group_id = target_group_id
-      AND user_id = auth.uid()
-      AND is_active = true
+  SELECT target_group_id IS NOT NULL AND (
+    is_platform_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM group_memberships
+      WHERE group_id = target_group_id
+        AND user_id = auth.uid()
+        AND is_active = true
+    )
   );
 $$;
 
@@ -466,13 +500,16 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM group_memberships
-    WHERE group_id = target_group_id
-      AND user_id = auth.uid()
-      AND is_active = true
-      AND role = ANY(allowed_roles)
+  SELECT target_group_id IS NOT NULL AND (
+    is_platform_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM group_memberships
+      WHERE group_id = target_group_id
+        AND user_id = auth.uid()
+        AND is_active = true
+        AND role = ANY(allowed_roles)
+    )
   );
 $$;
 
@@ -597,6 +634,10 @@ BEGIN
     AND user_id = v_user_id
     AND is_active = true
   LIMIT 1;
+
+  IF is_platform_admin() THEN
+    v_actor_role := 'jefe_grupo';
+  END IF;
 
   IF v_actor_role IS NULL OR v_actor_role NOT IN ('jefe_grupo', 'subjefe_grupo') THEN
     RAISE EXCEPTION 'Solo Jefatura de Grupo puede generar invitaciones';
@@ -745,8 +786,8 @@ BEGIN
       AND is_active = true
   ) INTO v_is_jefe;
 
-  IF NOT v_is_jefe THEN
-    RAISE EXCEPTION 'Solo el Jefe de Grupo titular puede eliminar el tenant completo';
+  IF NOT v_is_jefe AND NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Solo el Jefe de Grupo titular o el Administrador Global puede eliminar el tenant completo';
   END IF;
 
   IF p_confirm_number IS NULL OR v_group.number <> p_confirm_number THEN
@@ -769,6 +810,232 @@ $$;
 
 REVOKE ALL ON FUNCTION delete_scout_group_tenant(uuid, integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION delete_scout_group_tenant(uuid, integer) TO authenticated;
+
+CREATE OR REPLACE FUNCTION admin_list_all_tenants()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Acceso restringido al Administrador Global de la plataforma';
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(row_obj ORDER BY (row_obj ->> 'number')::integer ASC), '[]'::jsonb)
+  INTO v_result
+  FROM (
+    SELECT jsonb_build_object(
+      'id', sg.id,
+      'number', sg.number,
+      'name', sg.name,
+      'district', sg.district,
+      'zone', sg.zone,
+      'org_model', sg.org_model,
+      'primary_color', sg.primary_color,
+      'accent_color', sg.accent_color,
+      'logo_url', sg.logo_url,
+      'created_at', sg.created_at,
+      'team_count', (
+        SELECT count(*)::integer
+        FROM group_memberships gm
+        WHERE gm.group_id = sg.id
+          AND gm.is_active = true
+      ),
+      'members_count', (
+        SELECT count(*)::integer
+        FROM group_members m
+        WHERE m.group_id = sg.id
+          AND m.is_active = true
+      ),
+      'jefe_name', (
+        SELECT gm.display_name
+        FROM group_memberships gm
+        WHERE gm.group_id = sg.id
+          AND gm.role = 'jefe_grupo'
+          AND gm.is_active = true
+        ORDER BY gm.created_at ASC
+        LIMIT 1
+      ),
+      'jefe_email', (
+        SELECT gm.member_email
+        FROM group_memberships gm
+        WHERE gm.group_id = sg.id
+          AND gm.role = 'jefe_grupo'
+          AND gm.is_active = true
+        ORDER BY gm.created_at ASC
+        LIMIT 1
+      )
+    ) AS row_obj
+    FROM scout_groups sg
+  ) sub;
+
+  RETURN v_result;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION admin_list_all_tenants() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION admin_list_all_tenants() TO authenticated;
+
+CREATE OR REPLACE FUNCTION admin_update_tenant(
+  p_group_id uuid,
+  p_number integer,
+  p_name text,
+  p_district text,
+  p_zone text,
+  p_org_model text DEFAULT 'tradicional'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clean_name text := trim(COALESCE(p_name, ''));
+  v_clean_district text := trim(COALESCE(p_district, ''));
+  v_clean_zone text := trim(COALESCE(p_zone, ''));
+  v_clean_model text := COALESCE(NULLIF(trim(p_org_model), ''), 'tradicional');
+  v_group scout_groups%ROWTYPE;
+BEGIN
+  IF NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Acceso restringido al Administrador Global de la plataforma';
+  END IF;
+
+  IF p_group_id IS NULL THEN
+    RAISE EXCEPTION 'Identificador de Grupo invalido';
+  END IF;
+
+  IF p_number IS NULL OR p_number <= 0 THEN
+    RAISE EXCEPTION 'Numero de Grupo invalido';
+  END IF;
+
+  IF char_length(v_clean_name) < 3 OR char_length(v_clean_district) < 2 OR char_length(v_clean_zone) < 2 THEN
+    RAISE EXCEPTION 'Completa nombre oficial, distrito y zona del Grupo';
+  END IF;
+
+  IF v_clean_model NOT IN ('tradicional', 'nucleo', 'comunitario', 'escolar') THEN
+    RAISE EXCEPTION 'Modalidad organizativa invalida';
+  END IF;
+
+  UPDATE scout_groups
+  SET
+    number = p_number,
+    name = v_clean_name,
+    district = v_clean_district,
+    zone = v_clean_zone,
+    org_model = v_clean_model
+  WHERE id = p_group_id
+  RETURNING * INTO v_group;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El Grupo Scout indicado no existe';
+  END IF;
+
+  RETURN to_jsonb(v_group);
+EXCEPTION
+  WHEN unique_violation THEN
+    RAISE EXCEPTION 'Ya existe otro Grupo Scout registrado con el numero %', p_number;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION admin_update_tenant(uuid, integer, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION admin_update_tenant(uuid, integer, text, text, text, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION admin_assign_tenant_leader(
+  p_group_id uuid,
+  p_target_email text,
+  p_role text DEFAULT 'jefe_grupo',
+  p_branch text DEFAULT 'jefatura'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clean_email text := lower(trim(COALESCE(p_target_email, '')));
+  v_target_user RECORD;
+  v_display_name text;
+BEGIN
+  IF NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Acceso restringido al Administrador Global de la plataforma';
+  END IF;
+
+  IF p_group_id IS NULL OR v_clean_email = '' THEN
+    RAISE EXCEPTION 'Indica el Grupo y el correo electronico del responsable';
+  END IF;
+
+  IF p_role NOT IN ('jefe_grupo', 'subjefe_grupo', 'jefe_rama', 'educador') THEN
+    RAISE EXCEPTION 'Rol invalido';
+  END IF;
+
+  IF p_branch NOT IN ('manada', 'unidad', 'caminantes', 'rovers', 'jefatura') THEN
+    RAISE EXCEPTION 'Rama invalida';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM scout_groups WHERE id = p_group_id) THEN
+    RAISE EXCEPTION 'El Grupo Scout indicado no existe';
+  END IF;
+
+  SELECT id, email, raw_user_meta_data
+  INTO v_target_user
+  FROM auth.users
+  WHERE lower(email) = v_clean_email
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No existe una cuenta registrada con el correo %. Debe registrarse primero o ingresar con invitacion.', v_clean_email;
+  END IF;
+
+  v_display_name := COALESCE(
+    NULLIF(trim(v_target_user.raw_user_meta_data ->> 'full_name'), ''),
+    NULLIF(split_part(v_target_user.email, '@', 1), ''),
+    'Responsable Scout'
+  );
+
+  PERFORM set_config('app.tenant_provisioning', 'true', true);
+
+  INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    branch,
+    display_name,
+    member_email,
+    is_active
+  )
+  VALUES (
+    p_group_id,
+    v_target_user.id,
+    p_role,
+    p_branch,
+    v_display_name,
+    v_target_user.email,
+    true
+  )
+  ON CONFLICT (group_id, user_id) DO UPDATE SET
+    role = EXCLUDED.role,
+    branch = EXCLUDED.branch,
+    display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), group_memberships.display_name),
+    member_email = COALESCE(EXCLUDED.member_email, group_memberships.member_email),
+    is_active = true;
+
+  RETURN jsonb_build_object(
+    'group_id', p_group_id,
+    'user_id', v_target_user.id,
+    'email', v_target_user.email,
+    'role', p_role,
+    'branch', p_branch,
+    'display_name', v_display_name
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION admin_assign_tenant_leader(uuid, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION admin_assign_tenant_leader(uuid, text, text, text) TO authenticated;
 
 CREATE OR REPLACE FUNCTION accept_group_invitation(
   p_invite_code text,
@@ -1277,3 +1544,39 @@ CREATE POLICY saac_knowledge_base_select
   FOR SELECT
   TO authenticated
   USING (auth.uid() IS NOT NULL);
+
+-- 6.8 Politicas para platform_admins (solo lectura de su propia fila; alta unicamente via SQL Editor / service_role)
+ALTER TABLE platform_admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_admins FORCE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE platform_admins FROM anon;
+GRANT SELECT ON TABLE platform_admins TO authenticated;
+
+DROP POLICY IF EXISTS platform_admins_select ON platform_admins;
+CREATE POLICY platform_admins_select
+  ON platform_admins
+  FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS platform_admins_insert ON platform_admins;
+CREATE POLICY platform_admins_insert
+  ON platform_admins
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (false);
+
+DROP POLICY IF EXISTS platform_admins_update ON platform_admins;
+CREATE POLICY platform_admins_update
+  ON platform_admins
+  FOR UPDATE
+  TO authenticated
+  USING (false)
+  WITH CHECK (false);
+
+DROP POLICY IF EXISTS platform_admins_delete ON platform_admins;
+CREATE POLICY platform_admins_delete
+  ON platform_admins
+  FOR DELETE
+  TO authenticated
+  USING (false);

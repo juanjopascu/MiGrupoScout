@@ -16,6 +16,8 @@ import {
   writeLocalPref
 } from './offlineDb.js';
 import {
+  getLocalGroupById,
+  isLocalPlatformAdmin,
   listLocalUserMemberships,
   updateLocalGroupRecord
 } from './localAuthStore.js';
@@ -471,20 +473,95 @@ async function resolveFromMembershipList(list, preferredGroupId) {
   };
 }
 
+async function detectRemotePlatformAdmin(userId) {
+  if (!userId || !isSupabaseConfigured || !supabase) return false;
+  try {
+    const { data, error } = await supabase.rpc('is_platform_admin');
+    if (!error && typeof data === 'boolean') {
+      return data;
+    }
+  } catch {
+    // Fallback a consulta directa protegida por RLS
+  }
+  try {
+    const { data, error } = await supabase
+      .from('platform_admins')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return !error && Boolean(data?.user_id);
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveUserActiveGroup(session, preferredGroupId = null) {
   if (!session?.user?.id) {
     return null;
   }
 
+  const targetGroupId = preferredGroupId || readLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
+
   if (!isSupabaseConfigured || !supabase || session?.isLocal) {
+    const isPlatformAdmin = isLocalPlatformAdmin(session.user.id);
     const localItems = listLocalUserMemberships(session.user.id);
-    return resolveFromMembershipList(localItems, preferredGroupId);
+
+    if (isPlatformAdmin && targetGroupId && !localItems.some((m) => m.group_id === targetGroupId)) {
+      const adminGroup = getLocalGroupById(targetGroupId);
+      if (adminGroup) {
+        await saveGroupProfile({
+          ...adminGroup,
+          userRole: 'jefe_grupo',
+          userBranch: 'jefatura',
+          userDisplayName: session.user.user_metadata?.full_name || 'Administrador Global'
+        });
+        writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, adminGroup.id);
+        return {
+          groupId: adminGroup.id,
+          role: 'jefe_grupo',
+          branch: 'jefatura',
+          group: adminGroup,
+          memberships: localItems,
+          isPlatformAdmin: true,
+          viaPlatformAdmin: true
+        };
+      }
+    }
+
+    const resolved = await resolveFromMembershipList(localItems, preferredGroupId);
+    return {
+      ...resolved,
+      role: isPlatformAdmin && resolved.groupId ? 'jefe_grupo' : resolved.role,
+      isPlatformAdmin,
+      viaPlatformAdmin: false
+    };
   }
 
   const readCachedFallback = async () => {
     const cached = readLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, null);
     if (cached && cached.userId === session.user.id && Array.isArray(cached.items)) {
-      return resolveFromMembershipList(cached.items, preferredGroupId);
+      const cachedAdmin = Boolean(cached.isPlatformAdmin);
+      if (cachedAdmin && targetGroupId && !cached.items.some((m) => m.group_id === targetGroupId)) {
+        const cachedProfile = await getGroupProfile(targetGroupId);
+        if (cachedProfile && cachedProfile.id === targetGroupId) {
+          return {
+            groupId: cachedProfile.id,
+            role: 'jefe_grupo',
+            branch: 'jefatura',
+            group: cachedProfile,
+            memberships: cached.items,
+            isPlatformAdmin: true,
+            viaPlatformAdmin: true
+          };
+        }
+      }
+      const resolved = await resolveFromMembershipList(cached.items, preferredGroupId);
+      return {
+        ...resolved,
+        role: cachedAdmin && resolved.groupId ? 'jefe_grupo' : resolved.role,
+        isPlatformAdmin: cachedAdmin,
+        viaPlatformAdmin: false
+      };
     }
     return null;
   };
@@ -494,14 +571,17 @@ export async function resolveUserActiveGroup(session, preferredGroupId = null) {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('group_memberships')
-      .select('id, group_id, role, branch, display_name, scout_groups (*)')
-      .eq('user_id', session.user.id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true });
+    const [membershipsRes, isPlatformAdmin] = await Promise.all([
+      supabase
+        .from('group_memberships')
+        .select('id, group_id, role, branch, display_name, scout_groups (*)')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true }),
+      detectRemotePlatformAdmin(session.user.id)
+    ]);
 
-    if (error) {
+    if (membershipsRes.error) {
       const fallback = await readCachedFallback();
       if (fallback) {
         return fallback;
@@ -511,17 +591,53 @@ export async function resolveUserActiveGroup(session, preferredGroupId = null) {
         role: null,
         branch: null,
         group: null,
-        memberships: []
+        memberships: [],
+        isPlatformAdmin,
+        viaPlatformAdmin: false
       };
     }
 
-    const items = Array.isArray(data) ? data : [];
+    const items = Array.isArray(membershipsRes.data) ? membershipsRes.data : [];
     writeLocalPref(LS_KEYS.CACHED_MEMBERSHIPS, {
       userId: session.user.id,
-      items
+      items,
+      isPlatformAdmin
     });
 
-    return resolveFromMembershipList(items, preferredGroupId);
+    if (isPlatformAdmin && targetGroupId && !items.some((m) => m.group_id === targetGroupId)) {
+      const { data: adminGroup, error: adminGroupErr } = await supabase
+        .from('scout_groups')
+        .select('*')
+        .eq('id', targetGroupId)
+        .maybeSingle();
+
+      if (!adminGroupErr && adminGroup) {
+        await saveGroupProfile({
+          ...adminGroup,
+          userRole: 'jefe_grupo',
+          userBranch: 'jefatura',
+          userDisplayName: session.user.user_metadata?.full_name || 'Administrador Global'
+        });
+        writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, adminGroup.id);
+        return {
+          groupId: adminGroup.id,
+          role: 'jefe_grupo',
+          branch: 'jefatura',
+          group: adminGroup,
+          memberships: items,
+          isPlatformAdmin: true,
+          viaPlatformAdmin: true
+        };
+      }
+    }
+
+    const resolved = await resolveFromMembershipList(items, preferredGroupId);
+    return {
+      ...resolved,
+      role: isPlatformAdmin && resolved.groupId ? 'jefe_grupo' : resolved.role,
+      isPlatformAdmin,
+      viaPlatformAdmin: false
+    };
   } catch {
     return readCachedFallback();
   }

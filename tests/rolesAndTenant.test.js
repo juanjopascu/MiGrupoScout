@@ -26,10 +26,14 @@ import {
 import { parseMembersCsv } from '../src/domain/memberCsvParser.js';
 import {
   acceptLocalInvitation,
+  adminAssignLocalTenantLeader,
+  adminListAllLocalTenants,
+  adminUpdateLocalTenant,
   createLocalGroupTenant,
   createLocalInvitation,
   deleteLocalGroupTenant,
   getLocalSession,
+  isLocalPlatformAdmin,
   listLocalGroupTeam,
   listLocalUserMemberships,
   previewLocalInvitation,
@@ -318,5 +322,94 @@ describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () =>
     expect(okDelete.ok).toBe(true);
     expect(listLocalGroupTeam(tenantRes.group.id)).toHaveLength(0);
     expect(listLocalUserMemberships(signupJefe.session.user.id)).toHaveLength(0);
+  });
+
+  it('permite al Administrador Global supervisar todos los grupos, evitar superposiciones, reasignar Jefe y eliminar tenants', async () => {
+    // Primer usuario creado previamente es Administrador Global; educador1 NO es admin
+    await signInLocalUser('educador1@gruposcout.org.ar', 'claveSegura456');
+    const educadorSession = getLocalSession();
+    expect(isLocalPlatformAdmin(educadorSession.user.id)).toBe(false);
+    expect(adminListAllLocalTenants().ok).toBe(false);
+
+    // Segundo dirigente funda el Grupo 555 y Grupo 777
+    const signupOwner555 = await signUpLocalUser(
+      'jefe555@gruposcout.org.ar',
+      'claveSegura789',
+      'Pedro Jefe 555'
+    );
+    expect(signupOwner555.error).toBeNull();
+    expect(isLocalPlatformAdmin(signupOwner555.session.user.id)).toBe(false);
+
+    const g555 = createLocalGroupTenant({
+      number: 555,
+      name: 'Grupo Scout 555 Norte',
+      district: 'Distrito 3',
+      zone: 'Zona 8',
+      org_model: 'tradicional'
+    });
+    expect(g555.ok).toBe(true);
+
+    const g777 = createLocalGroupTenant({
+      number: 777,
+      name: 'Grupo Scout 777 Sur',
+      district: 'Distrito 4',
+      zone: 'Zona 8',
+      org_model: 'nucleo'
+    });
+    expect(g777.ok).toBe(true);
+
+    // El Administrador Global ingresa y consulta ambos grupos sin ser miembro directo
+    const adminLogin = await signInLocalUser('jefe412@gruposcout.org.ar', 'claveSegura123');
+    expect(adminLogin.error).toBeNull();
+    expect(isLocalPlatformAdmin(adminLogin.session.user.id)).toBe(true);
+
+    const listed = adminListAllLocalTenants();
+    expect(listed.ok).toBe(true);
+    expect(listed.tenants.map((t) => t.number)).toEqual([555, 777]);
+
+    // Previene superposicion si intenta cambiar el 555 al 777
+    const collision = adminUpdateLocalTenant(g555.group.id, {
+      number: 777,
+      name: 'Grupo Colision',
+      district: 'Distrito 3',
+      zone: 'Zona 8',
+      org_model: 'tradicional'
+    });
+    expect(collision.ok).toBe(false);
+
+    // Edita el Grupo 555 a un numero libre (556)
+    const updated = adminUpdateLocalTenant(g555.group.id, {
+      number: 556,
+      name: 'Grupo Scout 556 Renovado',
+      district: 'Distrito 3',
+      zone: 'Zona 8',
+      org_model: 'escolar'
+    });
+    expect(updated.ok).toBe(true);
+    expect(updated.group.number).toBe(556);
+
+    // Reasigna a educador1 como Jefe de Grupo titular de 556
+    const assigned = adminAssignLocalTenantLeader({
+      groupId: g555.group.id,
+      targetEmail: 'educador1@gruposcout.org.ar',
+      role: 'jefe_grupo',
+      branch: 'jefatura'
+    });
+    expect(assigned.ok).toBe(true);
+    expect(assigned.assignment.role).toBe('jefe_grupo');
+
+    // Rechaza correo inexistente
+    const missingUser = adminAssignLocalTenantLeader({
+      groupId: g555.group.id,
+      targetEmail: 'nadie@gruposcout.org.ar',
+      role: 'jefe_grupo',
+      branch: 'jefatura'
+    });
+    expect(missingUser.ok).toBe(false);
+
+    // Admin Global puede eliminar el Grupo 777 directamente sin pertenecer a su equipo
+    const adminDelete = deleteLocalGroupTenant(g777.group.id, 777);
+    expect(adminDelete.ok).toBe(true);
+    expect(adminListAllLocalTenants().tenants.map((t) => t.number)).toEqual([556]);
   });
 });

@@ -7,9 +7,13 @@ import {
 import { isValidUuid } from '../domain/validators.js';
 import {
   acceptLocalInvitation,
+  adminAssignLocalTenantLeader,
+  adminListAllLocalTenants,
+  adminUpdateLocalTenant,
   createLocalGroupTenant,
   createLocalInvitation,
   deleteLocalGroupTenant,
+  isLocalPlatformAdmin,
   listLocalGroupTeam,
   listLocalInvitations,
   listLocalUserMemberships,
@@ -323,4 +327,127 @@ export async function deleteScoutGroupTenant({ groupId, confirmNumber }) {
     groupNumber: data?.group_number || parsedNumber,
     groupName: data?.group_name || ''
   };
+}
+
+export async function checkIsPlatformAdmin(userId) {
+  if (!userId) return false;
+  if (!isSupabaseConfigured || !supabase) {
+    return isLocalPlatformAdmin(userId);
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('is_platform_admin');
+    if (!error && typeof data === 'boolean') {
+      return data;
+    }
+  } catch {
+    // Fallback a consulta directa protegida por RLS
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('platform_admins')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return !error && Boolean(data?.user_id);
+  } catch {
+    return false;
+  }
+}
+
+export async function adminListAllTenants() {
+  if (!isSupabaseConfigured || !supabase) {
+    return adminListAllLocalTenants();
+  }
+
+  const { data, error } = await supabase.rpc('admin_list_all_tenants');
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo obtener el listado global de Grupos.',
+      tenants: []
+    };
+  }
+
+  return {
+    ok: true,
+    tenants: Array.isArray(data) ? data : []
+  };
+}
+
+export async function adminUpdateTenant(groupId, input) {
+  if (!isValidUuid(groupId)) {
+    return { ok: false, error: 'Identificador de Grupo invalido.' };
+  }
+
+  const validation = validateGroupTenantInput(input);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0] || 'Datos del Grupo invalidos.';
+    return { ok: false, error: firstError, errors: validation.errors };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return adminUpdateLocalTenant(groupId, validation.sanitized);
+  }
+
+  const { number, name, district, zone, org_model } = validation.sanitized;
+  const { data, error } = await supabase.rpc('admin_update_tenant', {
+    p_group_id: groupId,
+    p_number: number,
+    p_name: name,
+    p_district: district,
+    p_zone: zone,
+    p_org_model: org_model
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo actualizar el Grupo Scout.'
+    };
+  }
+
+  return { ok: true, group: data };
+}
+
+export async function adminAssignTenantLeader({
+  groupId,
+  targetEmail,
+  role = 'jefe_grupo',
+  branch = 'jefatura'
+}) {
+  if (!isValidUuid(groupId)) {
+    return { ok: false, error: 'Identificador de Grupo invalido.' };
+  }
+
+  const cleanEmail = String(targetEmail || '').trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail)) {
+    return { ok: false, error: 'Ingresa un correo electronico valido.' };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return adminAssignLocalTenantLeader({
+      groupId,
+      targetEmail: cleanEmail,
+      role,
+      branch
+    });
+  }
+
+  const { data, error } = await supabase.rpc('admin_assign_tenant_leader', {
+    p_group_id: groupId,
+    p_target_email: cleanEmail,
+    p_role: role,
+    p_branch: branch
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message || 'No se pudo asignar el responsable del Grupo.'
+    };
+  }
+
+  return { ok: true, assignment: data };
 }

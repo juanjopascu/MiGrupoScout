@@ -11,6 +11,7 @@ import {
   LogOut,
   RefreshCw,
   Settings,
+  ShieldCheck,
   Tent,
   Users,
   Wifi,
@@ -72,6 +73,8 @@ export default function AppShell({
   userRole,
   isDemoMode,
   isAuthenticated,
+  isPlatformAdmin = false,
+  viaPlatformAdmin = false,
   isOnline,
   networkOnline = true,
   manualOffline = false,
@@ -82,6 +85,7 @@ export default function AppShell({
   pushState,
   onOpenPushManager,
   onOpenTeamManager,
+  onOpenPlatformAdmin,
   onOpenAuthScreen,
   onOpenSettings,
   syncState,
@@ -91,7 +95,11 @@ export default function AppShell({
   children
 }) {
   const activeNav = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
-  const roleTag = isDemoMode ? 'Demo' : getRoleLabel(userRole);
+  const roleTag = isDemoMode
+    ? 'Demo'
+    : viaPlatformAdmin
+      ? 'Admin Global'
+      : getRoleLabel(userRole);
   const groupSubtitle = groupProfile
     ? `Nro. ${groupProfile.number || '-'} - ${roleTag}`
     : 'ConsejoScout SAAC';
@@ -249,6 +257,18 @@ export default function AppShell({
             <span className="hidden lg:inline truncate">Alertas Push</span>
           </button>
 
+          {isPlatformAdmin && onOpenPlatformAdmin && (
+            <button
+              type="button"
+              onClick={onOpenPlatformAdmin}
+              aria-label="Administracion Global de Grupos"
+              className="w-full min-h-[44px] px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center lg:justify-start gap-3 text-sm font-semibold transition-colors"
+            >
+              <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
+              <span className="hidden lg:inline truncate">Admin Global</span>
+            </button>
+          )}
+
           {onOpenTeamManager && (
             <button
               type="button"
@@ -362,6 +382,17 @@ export default function AppShell({
             >
               <PushBellIcon pushState={pushState} />
             </button>
+
+            {isPlatformAdmin && onOpenPlatformAdmin && (
+              <button
+                type="button"
+                onClick={onOpenPlatformAdmin}
+                aria-label="Administracion Global de Grupos"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+              >
+                <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+              </button>
+            )}
 
             {onOpenTeamManager && (
               <button

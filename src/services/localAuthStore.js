@@ -19,7 +19,8 @@ const LOCAL_STORE_KEYS = Object.freeze({
   SESSION: 'consejoscout:local_session_v1',
   GROUPS: 'consejoscout:local_groups_v1',
   MEMBERSHIPS: 'consejoscout:local_memberships_v1',
-  INVITATIONS: 'consejoscout:local_invitations_v1'
+  INVITATIONS: 'consejoscout:local_invitations_v1',
+  PLATFORM_ADMINS: 'consejoscout:local_platform_admins_v1'
 });
 
 const memoryFallback = new Map();
@@ -151,10 +152,38 @@ export async function signUpLocalUser(email, password, fullName = '') {
   };
 
   writeStoreJson(LOCAL_STORE_KEYS.USERS, [...users, newUser]);
+  if (users.length === 0) {
+    setLocalPlatformAdmin(newUser.id, true);
+  }
   const session = buildLocalSession(newUser);
   writeStoreJson(LOCAL_STORE_KEYS.SESSION, session);
 
   return { session, user: session.user, error: null };
+}
+
+export function isLocalPlatformAdmin(userId) {
+  if (!userId) return false;
+  const admins = readStoreJson(LOCAL_STORE_KEYS.PLATFORM_ADMINS, []);
+  return Array.isArray(admins) && admins.includes(userId);
+}
+
+export function setLocalPlatformAdmin(userId, enabled = true) {
+  if (!userId) return false;
+  const admins = readStoreJson(LOCAL_STORE_KEYS.PLATFORM_ADMINS, []);
+  const set = new Set(Array.isArray(admins) ? admins : []);
+  if (enabled) {
+    set.add(userId);
+  } else {
+    set.delete(userId);
+  }
+  writeStoreJson(LOCAL_STORE_KEYS.PLATFORM_ADMINS, [...set]);
+  return enabled;
+}
+
+export function getLocalGroupById(groupId) {
+  if (!groupId) return null;
+  const groups = readStoreJson(LOCAL_STORE_KEYS.GROUPS, []);
+  return groups.find((g) => g.id === groupId) || null;
 }
 
 export async function signInLocalUser(email, password) {
@@ -556,10 +585,10 @@ export function deleteLocalGroupTenant(groupId, confirmNumber) {
       m.is_active !== false
   );
 
-  if (!isJefe) {
+  if (!isJefe && !isLocalPlatformAdmin(session.user.id)) {
     return {
       ok: false,
-      error: 'Solo el Jefe de Grupo titular puede eliminar este tenant.'
+      error: 'Solo el Jefe de Grupo titular o el Administrador Global puede eliminar este tenant.'
     };
   }
 
@@ -589,5 +618,161 @@ export function deleteLocalGroupTenant(groupId, confirmNumber) {
     deletedGroupId: groupId,
     groupNumber: target.number,
     groupName: target.name
+  };
+}
+
+export function adminListAllLocalTenants() {
+  const session = getLocalSession();
+  if (!session?.user?.id || !isLocalPlatformAdmin(session.user.id)) {
+    return {
+      ok: false,
+      error: 'Acceso restringido al Administrador Global de la plataforma.',
+      tenants: []
+    };
+  }
+
+  const groups = readStoreJson(LOCAL_STORE_KEYS.GROUPS, []);
+  const memberships = readStoreJson(LOCAL_STORE_KEYS.MEMBERSHIPS, []);
+
+  const tenants = [...groups]
+    .sort((a, b) => Number(a.number) - Number(b.number))
+    .map((group) => {
+      const activeTeam = memberships.filter(
+        (m) => m.group_id === group.id && m.is_active !== false
+      );
+      const jefe = activeTeam.find((m) => m.role === 'jefe_grupo') || null;
+      return {
+        ...group,
+        team_count: activeTeam.length,
+        members_count: 0,
+        jefe_name: jefe?.display_name || null,
+        jefe_email: jefe?.member_email || null
+      };
+    });
+
+  return { ok: true, tenants };
+}
+
+export function adminUpdateLocalTenant(groupId, input) {
+  const session = getLocalSession();
+  if (!session?.user?.id || !isLocalPlatformAdmin(session.user.id)) {
+    return { ok: false, error: 'Acceso restringido al Administrador Global.' };
+  }
+
+  const groups = readStoreJson(LOCAL_STORE_KEYS.GROUPS, []);
+  const target = groups.find((g) => g.id === groupId);
+  if (!target) {
+    return { ok: false, error: 'El Grupo Scout indicado no existe.' };
+  }
+
+  const validation = validateGroupTenantInput(input);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0] || 'Datos del Grupo invalidos.';
+    return { ok: false, error: firstError, errors: validation.errors };
+  }
+
+  const { number, name, district, zone, org_model } = validation.sanitized;
+  if (groups.some((g) => g.id !== groupId && Number(g.number) === Number(number))) {
+    return {
+      ok: false,
+      error: `Ya existe otro Grupo Scout registrado con el numero ${number}.`
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const updatedGroup = {
+    ...target,
+    number,
+    name,
+    district,
+    zone,
+    org_model,
+    updated_at: nowIso
+  };
+
+  writeStoreJson(
+    LOCAL_STORE_KEYS.GROUPS,
+    groups.map((g) => (g.id === groupId ? updatedGroup : g))
+  );
+
+  return { ok: true, group: updatedGroup };
+}
+
+export function adminAssignLocalTenantLeader({
+  groupId,
+  targetEmail,
+  role = 'jefe_grupo',
+  branch = 'jefatura'
+}) {
+  const session = getLocalSession();
+  if (!session?.user?.id || !isLocalPlatformAdmin(session.user.id)) {
+    return { ok: false, error: 'Acceso restringido al Administrador Global.' };
+  }
+
+  const groups = readStoreJson(LOCAL_STORE_KEYS.GROUPS, []);
+  if (!groups.some((g) => g.id === groupId)) {
+    return { ok: false, error: 'El Grupo Scout indicado no existe.' };
+  }
+
+  const cleanEmail = sanitizeString(targetEmail, { maxLength: 160 }).toLowerCase();
+  const users = readStoreJson(LOCAL_STORE_KEYS.USERS, []);
+  const foundUser = users.find((u) => u.email === cleanEmail);
+  if (!foundUser) {
+    return {
+      ok: false,
+      error: `No existe una cuenta registrada con el correo ${cleanEmail}. Debe registrarse primero o ingresar con invitacion.`
+    };
+  }
+
+  const validRoles = ['jefe_grupo', 'subjefe_grupo', 'jefe_rama', 'educador'];
+  const validBranches = ['manada', 'unidad', 'caminantes', 'rovers', 'jefatura'];
+  const nextRole = validRoles.includes(role) ? role : 'jefe_grupo';
+  const nextBranch = validBranches.includes(branch) ? branch : 'jefatura';
+  const nowIso = new Date().toISOString();
+
+  const memberships = readStoreJson(LOCAL_STORE_KEYS.MEMBERSHIPS, []);
+  const existing = memberships.find(
+    (m) => m.group_id === groupId && m.user_id === foundUser.id
+  );
+
+  const nextMembership = existing
+    ? {
+        ...existing,
+        role: nextRole,
+        branch: nextBranch,
+        display_name: existing.display_name || foundUser.fullName,
+        member_email: foundUser.email,
+        is_active: true,
+        updated_at: nowIso
+      }
+    : {
+        id: createUuidV4(),
+        group_id: groupId,
+        user_id: foundUser.id,
+        role: nextRole,
+        branch: nextBranch,
+        display_name: foundUser.fullName,
+        member_email: foundUser.email,
+        is_active: true,
+        created_at: nowIso,
+        updated_at: nowIso
+      };
+
+  const nextMemberships = existing
+    ? memberships.map((m) => (m.id === existing.id ? nextMembership : m))
+    : [...memberships, nextMembership];
+
+  writeStoreJson(LOCAL_STORE_KEYS.MEMBERSHIPS, nextMemberships);
+
+  return {
+    ok: true,
+    assignment: {
+      group_id: groupId,
+      user_id: foundUser.id,
+      email: foundUser.email,
+      role: nextRole,
+      branch: nextBranch,
+      display_name: foundUser.fullName
+    }
   };
 }

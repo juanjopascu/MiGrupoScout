@@ -1,14 +1,16 @@
-import { WifiOff } from 'lucide-react';
+import { ShieldCheck, WifiOff } from 'lucide-react';
 import AuthTenantPanel from './AuthTenantPanel.jsx';
 import FleurDeLisIcon from './FleurDeLisIcon.jsx';
 
 export default function AuthScreen({
   session,
   isOnline = true,
+  isPlatformAdmin = false,
   pendingInviteCode,
   hasActiveGroup,
   onAuthChanged,
   onTenantReady,
+  onOpenPlatformAdmin,
   onContinueDemo,
   onLogout
 }) {
@@ -43,6 +45,17 @@ export default function AuthScreen({
           />
 
           <div className="pt-4 border-t border-slate-200 space-y-2.5">
+            {session && isPlatformAdmin && onOpenPlatformAdmin && (
+              <button
+                type="button"
+                onClick={onOpenPlatformAdmin}
+                className="w-full h-11 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                <span>Admin Global (ver y gestionar todos los Grupos)</span>
+              </button>
+            )}
+
             {!session ? (
               <button
                 type="button"

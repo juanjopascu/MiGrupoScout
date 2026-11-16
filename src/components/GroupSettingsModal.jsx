@@ -7,6 +7,7 @@ import {
   LogOut,
   RefreshCw,
   Shield,
+  ShieldCheck,
   Users,
   Wifi,
   WifiOff,
@@ -42,6 +43,8 @@ export default function GroupSettingsModal({
   pendingInviteCode,
   onSwitchGroup,
   onOpenTeamManager,
+  isPlatformAdmin = false,
+  onOpenPlatformAdmin,
   onAuthChanged,
   onTenantReady,
   onTenantDeleted,
@@ -312,6 +315,20 @@ export default function GroupSettingsModal({
 
             {session && (
               <div className="flex flex-wrap gap-2 pt-1">
+                {isPlatformAdmin && onOpenPlatformAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenPlatformAdmin();
+                    }}
+                    className="h-11 px-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold"
+                  >
+                    <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                    <span>Admin Global</span>
+                  </button>
+                )}
+
                 {hasActiveGroup && (
                   <button
                     type="button"

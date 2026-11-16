@@ -4,6 +4,7 @@ import AuthScreen from './components/AuthScreen.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import GroupSettingsModal from './components/GroupSettingsModal.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
+import { PlatformAdminModal } from './components/PlatformAdminModal.jsx';
 import PushNotificationManager from './components/PushNotificationManager.jsx';
 import TeamManagementModal from './components/TeamManagementModal.jsx';
 import { applyGroupBrandingToDocument } from './domain/branding.js';
@@ -82,6 +83,8 @@ export default function App() {
   const [userRole, setUserRole] = useState('jefe_grupo');
   const [memberships, setMemberships] = useState([]);
   const [hasActiveGroup, setHasActiveGroup] = useState(true);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [viaPlatformAdmin, setViaPlatformAdmin] = useState(false);
   const [pendingInviteCode, setPendingInviteCode] = useState(() => {
     if (typeof window !== 'undefined') {
       const urlInvite = normalizeInviteCode(
@@ -104,6 +107,7 @@ export default function App() {
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [teamModalOpen, setTeamModalOpen] = useState(false);
+  const [platformAdminOpen, setPlatformAdminOpen] = useState(false);
 
   const [selectedCampId, setSelectedCampId] = useState(null);
   const [preloadedDocCamp, setPreloadedDocCamp] = useState(null);
@@ -141,10 +145,14 @@ export default function App() {
         let nextRole = 'jefe_grupo';
         let nextMemberships = [];
         let activeRemote = false;
+        let nextIsPlatformAdmin = false;
+        let nextViaPlatformAdmin = false;
 
         if (activeSession) {
           const resolved = await resolveUserActiveGroup(activeSession, preferredGroupId);
           nextMemberships = resolved?.memberships || [];
+          nextIsPlatformAdmin = Boolean(resolved?.isPlatformAdmin);
+          nextViaPlatformAdmin = Boolean(resolved?.viaPlatformAdmin);
           if (resolved?.groupId) {
             targetGroupId = resolved.groupId;
             nextRole = resolved.role || 'educador';
@@ -158,6 +166,8 @@ export default function App() {
         }
 
         setMemberships(nextMemberships);
+        setIsPlatformAdmin(nextIsPlatformAdmin);
+        setViaPlatformAdmin(nextViaPlatformAdmin);
         setHasActiveGroup(!activeSession || activeRemote);
         setUserRole(nextRole);
         setGroupId(targetGroupId);
@@ -379,6 +389,24 @@ export default function App() {
     await bootstrap();
   }
 
+  async function handleEnterTenantAsAdmin(targetGroupId) {
+    if (!targetGroupId) return;
+    setPlatformAdminOpen(false);
+    setSettingsModalOpen(false);
+    setTeamModalOpen(false);
+    setDemoBypass(false);
+    writeLocalPref(LS_KEYS.DEMO_BYPASS, false);
+    writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, targetGroupId);
+    await bootstrap(targetGroupId);
+  }
+
+  async function handleAdminTenantDeleted(deletedGroupId) {
+    if (deletedGroupId && deletedGroupId === groupId) {
+      writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
+    }
+    await bootstrap();
+  }
+
   async function handleLogout() {
     await unsubscribeFromPush({ session });
     await signOutSupabase();
@@ -388,6 +416,9 @@ export default function App() {
     setManualOffline(false);
     setSyncFeedback(null);
     setMemberships([]);
+    setIsPlatformAdmin(false);
+    setViaPlatformAdmin(false);
+    setPlatformAdminOpen(false);
     setUserRole('jefe_grupo');
     setHasActiveGroup(true);
     setPushState('default');
@@ -489,12 +520,24 @@ export default function App() {
         <AuthScreen
           session={session}
           isOnline={effectiveIsOnline}
+          isPlatformAdmin={isPlatformAdmin}
           pendingInviteCode={pendingInviteCode}
           hasActiveGroup={hasActiveGroup}
           onAuthChanged={handleAuthChanged}
           onTenantReady={handleTenantReady}
+          onOpenPlatformAdmin={() => setPlatformAdminOpen(true)}
           onContinueDemo={handleContinueDemo}
           onLogout={handleLogout}
+        />
+
+        <PlatformAdminModal
+          isOpen={platformAdminOpen}
+          onClose={() => setPlatformAdminOpen(false)}
+          activeGroupId={groupId}
+          session={session}
+          onEnterTenant={handleEnterTenantAsAdmin}
+          onTenantChanged={(changedId) => bootstrap(changedId || groupId)}
+          onTenantDeleted={handleAdminTenantDeleted}
         />
       </ErrorBoundary>
     );
@@ -509,6 +552,8 @@ export default function App() {
         userRole={userRole}
         isDemoMode={isDemoMode}
         isAuthenticated={Boolean(session)}
+        isPlatformAdmin={isPlatformAdmin}
+        viaPlatformAdmin={viaPlatformAdmin}
         isOnline={effectiveIsOnline}
         networkOnline={isOnline}
         manualOffline={manualOffline}
@@ -519,6 +564,7 @@ export default function App() {
         pushState={pushState}
         onOpenPushManager={() => setPushModalOpen(true)}
         onOpenTeamManager={() => setTeamModalOpen(true)}
+        onOpenPlatformAdmin={() => setPlatformAdminOpen(true)}
         onOpenAuthScreen={handleOpenAuthScreen}
         onOpenSettings={() => setSettingsModalOpen(true)}
         syncState={syncState}
@@ -636,6 +682,8 @@ export default function App() {
         pendingInviteCode={pendingInviteCode}
         onSwitchGroup={handleSwitchGroup}
         onOpenTeamManager={() => setTeamModalOpen(true)}
+        isPlatformAdmin={isPlatformAdmin}
+        onOpenPlatformAdmin={() => setPlatformAdminOpen(true)}
         onAuthChanged={handleAuthChanged}
         onTenantReady={handleTenantReady}
         onTenantDeleted={handleTenantDeleted}
@@ -647,6 +695,16 @@ export default function App() {
         manualOffline={manualOffline}
         onToggleManualOffline={handleToggleManualOffline}
         onExitDemo={handleOpenAuthScreen}
+      />
+
+      <PlatformAdminModal
+        isOpen={platformAdminOpen}
+        onClose={() => setPlatformAdminOpen(false)}
+        activeGroupId={groupId}
+        session={session}
+        onEnterTenant={handleEnterTenantAsAdmin}
+        onTenantChanged={(changedId) => bootstrap(changedId || groupId)}
+        onTenantDeleted={handleAdminTenantDeleted}
       />
     </ErrorBoundary>
   );
