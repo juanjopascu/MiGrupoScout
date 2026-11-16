@@ -14,6 +14,7 @@ import {
   createLocalGroupTenant,
   createLocalInvitation,
   deleteLocalGroupTenant,
+  getLocalGroupById,
   isLocalPlatformAdmin,
   listLocalGroupTeam,
   listLocalInvitations,
@@ -25,11 +26,20 @@ import {
   updateLocalTeamMember
 } from './localAuthStore.js';
 import {
+  DEMO_GROUP_ID,
   LS_KEYS,
   clearGroupOfflineData,
+  getCachedCollection,
+  getGroupProfile,
   readLocalPref,
   writeLocalPref
 } from './offlineDb.js';
+import {
+  buildExportFilename,
+  buildGroupCsvContent,
+  buildGroupJsonContent,
+  triggerBrowserDownload
+} from '../utils/groupExport.js';
 import { isSupabaseConfigured, supabase } from './supabaseClient.js';
 
 export function readPendingInviteCode() {
@@ -545,4 +555,125 @@ export async function resetMemberPassword({
       error: 'Error de red al intentar restablecer la clave.'
     };
   }
+}
+
+export async function exportGroupSnapshot(groupId, fallbackGroup = null) {
+  if (!groupId || (groupId !== DEMO_GROUP_ID && !isValidUuid(groupId))) {
+    return { ok: false, error: 'Identificador de Grupo invalido para exportar.' };
+  }
+
+  const exportedAt = new Date().toISOString();
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+  const shouldUseRemote =
+    isSupabaseConfigured && supabase && groupId !== DEMO_GROUP_ID && isOnline;
+
+  if (shouldUseRemote) {
+    try {
+      const [groupRes, teamRes, membersRes, campsRes, tasksRes] = await Promise.all([
+        supabase.from('scout_groups').select('*').eq('id', groupId).maybeSingle(),
+        supabase
+          .from('group_memberships')
+          .select('id, role, branch, display_name, member_email, is_active, created_at')
+          .eq('group_id', groupId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('group_members')
+          .select('*')
+          .eq('group_id', groupId)
+          .order('full_name', { ascending: true }),
+        supabase
+          .from('camp_checklists')
+          .select('*')
+          .eq('group_id', groupId)
+          .order('start_date', { ascending: true }),
+        supabase
+          .from('council_tasks')
+          .select('*')
+          .eq('group_id', groupId)
+          .order('due_date', { ascending: true })
+      ]);
+
+      const group = groupRes.data || fallbackGroup || (await getGroupProfile(groupId));
+      if (!group) {
+        return { ok: false, error: 'No se encontro la informacion del Grupo Scout.' };
+      }
+
+      return {
+        ok: true,
+        data: {
+          exportedAt,
+          group,
+          team: Array.isArray(teamRes.data) ? teamRes.data : [],
+          members: Array.isArray(membersRes.data) ? membersRes.data : [],
+          camps: Array.isArray(campsRes.data) ? campsRes.data : [],
+          tasks: Array.isArray(tasksRes.data) ? tasksRes.data : []
+        }
+      };
+    } catch {
+      // Fallback a cache local si falla la consulta remota
+    }
+  }
+
+  const localGroup =
+    fallbackGroup || getLocalGroupById(groupId) || (await getGroupProfile(groupId));
+  if (!localGroup) {
+    return { ok: false, error: 'No se encontro la informacion local del Grupo Scout.' };
+  }
+
+  const [members, camps, tasks] = await Promise.all([
+    getCachedCollection('group_members', groupId),
+    getCachedCollection('camp_checklists', groupId),
+    getCachedCollection('council_tasks', groupId)
+  ]);
+
+  return {
+    ok: true,
+    data: {
+      exportedAt,
+      group: localGroup,
+      team: groupId === DEMO_GROUP_ID ? [] : listLocalGroupTeam(groupId),
+      members: Array.isArray(members) ? members : [],
+      camps: Array.isArray(camps) ? camps : [],
+      tasks: Array.isArray(tasks) ? tasks : []
+    }
+  };
+}
+
+export async function downloadGroupBackup({
+  groupId,
+  format = 'csv',
+  fallbackGroup = null
+}) {
+  const snapshot = await exportGroupSnapshot(groupId, fallbackGroup);
+  if (!snapshot.ok) {
+    return snapshot;
+  }
+
+  const safeFormat = format === 'json' ? 'json' : 'csv';
+  const filename = buildExportFilename(snapshot.data.group, safeFormat);
+  const content =
+    safeFormat === 'json'
+      ? buildGroupJsonContent(snapshot.data)
+      : buildGroupCsvContent(snapshot.data);
+  const mimeType =
+    safeFormat === 'json'
+      ? 'application/json;charset=utf-8'
+      : 'text/csv;charset=utf-8';
+
+  const started = triggerBrowserDownload(content, filename, mimeType);
+  if (!started) {
+    return { ok: false, error: 'Descarga no disponible en este entorno.' };
+  }
+
+  return {
+    ok: true,
+    filename,
+    counts: {
+      team: snapshot.data.team.length,
+      members: snapshot.data.members.length,
+      camps: snapshot.data.camps.length,
+      tasks: snapshot.data.tasks.length
+    }
+  };
 }

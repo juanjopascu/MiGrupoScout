@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
+  Download,
   HardDrive,
   LogOut,
   RefreshCw,
@@ -25,6 +26,7 @@ import {
   getRoleLabel
 } from '../domain/roles.js';
 import { isSupabaseConfigured } from '../services/supabaseClient.js';
+import { downloadGroupBackup } from '../services/tenantService.js';
 import { cleanUserText, formatDateAr } from '../utils/textSanitizer.js';
 import AuthTenantPanel from './AuthTenantPanel.jsx';
 import DeleteTenantCard from './DeleteTenantCard.jsx';
@@ -70,10 +72,12 @@ export default function GroupSettingsModal({
   );
   const [logoUrl, setLogoUrl] = useState(groupProfile?.logo_url || null);
   const [saveMessage, setSaveMessage] = useState(null);
+  const [exportBusy, setExportBusy] = useState(false);
 
   const isDemoMode = !session || !hasActiveGroup;
   const canEditGroup = isDemoMode || canEditGroupSettings(userRole);
   const canEditBranding = isDemoMode || canEditGroupBranding(userRole);
+  const canExportGroup = canEditGroup || isPlatformAdmin;
 
   useEffect(() => {
     if (!isOpen) {
@@ -495,6 +499,74 @@ export default function GroupSettingsModal({
                 </button>
               )}
             </form>
+          )}
+
+          {(isDemoMode || (hasActiveGroup && canExportGroup)) && (
+            <section className="p-4 rounded-xl border border-slate-300 bg-slate-50 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Download className="w-4 h-4 text-[var(--brand-primary)]" aria-hidden="true" />
+                  <span>Descargar informacion del Grupo</span>
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Exporta los datos del Grupo, equipo dirigente, padron de integrantes, salidas y tareas de consejo.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={exportBusy}
+                  onClick={async () => {
+                    setExportBusy(true);
+                    setSaveMessage(null);
+                    const res = await downloadGroupBackup({
+                      groupId: activeGroupId,
+                      format: 'csv',
+                      fallbackGroup: groupProfile
+                    });
+                    setExportBusy(false);
+                    setSaveMessage(
+                      res.ok
+                        ? {
+                            type: 'success',
+                            text: `Descarga lista (${res.filename}): ${res.counts.team} dirigentes, ${res.counts.members} integrantes, ${res.counts.camps} salidas.`
+                          }
+                        : { type: 'error', text: res.error }
+                    );
+                  }}
+                  className="h-10 px-4 inline-flex items-center gap-2 rounded-lg border border-slate-400 bg-white hover:bg-slate-100 text-slate-900 text-xs sm:text-sm font-semibold disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" aria-hidden="true" />
+                  <span>Descargar CSV (Excel)</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={exportBusy}
+                  onClick={async () => {
+                    setExportBusy(true);
+                    setSaveMessage(null);
+                    const res = await downloadGroupBackup({
+                      groupId: activeGroupId,
+                      format: 'json',
+                      fallbackGroup: groupProfile
+                    });
+                    setExportBusy(false);
+                    setSaveMessage(
+                      res.ok
+                        ? {
+                            type: 'success',
+                            text: `Respaldo JSON descargado (${res.filename}).`
+                          }
+                        : { type: 'error', text: res.error }
+                    );
+                  }}
+                  className="h-10 px-4 inline-flex items-center gap-2 rounded-lg border border-slate-400 bg-white hover:bg-slate-100 text-slate-900 text-xs sm:text-sm font-semibold disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" aria-hidden="true" />
+                  <span>Descargar JSON (Backup)</span>
+                </button>
+              </div>
+            </section>
           )}
 
           {session && !isDemoMode && (

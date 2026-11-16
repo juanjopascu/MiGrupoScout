@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Building2,
+  Download,
   Edit3,
   KeyRound,
   LogIn,
@@ -28,6 +29,7 @@ import {
   adminUpdateTenant,
   createScoutGroupTenant,
   deleteScoutGroupTenant,
+  downloadGroupBackup,
   resetMemberPassword
 } from '../services/tenantService.js';
 import GroupLogoBadge from './GroupLogoBadge.jsx';
@@ -237,6 +239,25 @@ export function PlatformAdminModal({
     setFeedback({
       type: 'success',
       text: `Clave restablecida para Jefatura de #${tenant.number} (${res.email || tenant.jefe_name}). Clave temporal: ${applied}`
+    });
+  };
+
+  const handleDownloadTenant = async (tenant, format = 'csv') => {
+    setBusyKey(`download:${tenant.id}`);
+    setFeedback(null);
+    const res = await downloadGroupBackup({
+      groupId: tenant.id,
+      format,
+      fallbackGroup: tenant
+    });
+    setBusyKey(null);
+    if (!res.ok) {
+      setFeedback({ type: 'error', text: res.error });
+      return;
+    }
+    setFeedback({
+      type: 'success',
+      text: `Descarga lista (${res.filename}): ${res.counts.team} dirigentes, ${res.counts.members} integrantes, ${res.counts.camps} salidas.`
     });
   };
 
@@ -629,6 +650,24 @@ export function PlatformAdminModal({
                             Reset clave Jefe
                           </button>
                         )}
+                        <button
+                          type="button"
+                          disabled={busyKey === `download:${tenant.id}`}
+                          onClick={() => void handleDownloadTenant(tenant, 'csv')}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Descargar CSV
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyKey === `download:${tenant.id}`}
+                          onClick={() => void handleDownloadTenant(tenant, 'json')}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          JSON
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
