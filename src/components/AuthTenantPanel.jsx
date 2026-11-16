@@ -3,14 +3,19 @@ import {
   AlertTriangle,
   Building2,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   LogIn,
+  Mail,
   ShieldCheck,
   UserPlus
 } from 'lucide-react';
 import { BRANCHES } from '../domain/saacRulesConstants.js';
 import { getRoleLabel, normalizeInviteCode } from '../domain/roles.js';
 import {
+  isSupabaseConfigured,
+  resetPasswordForEmail,
   signInWithEmailPassword,
   signUpWithEmailPassword
 } from '../services/supabaseClient.js';
@@ -32,6 +37,7 @@ export default function AuthTenantPanel({
   const [authTab, setAuthTab] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authMessage, setAuthMessage] = useState(null);
@@ -133,6 +139,35 @@ export default function AuthTenantPanel({
     }
   }
 
+  async function handleResetPassword() {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setAuthMessage({
+        type: 'error',
+        text: 'Ingresa tu correo electronico para enviarte el enlace de recuperacion.'
+      });
+      return;
+    }
+    setAuthMessage(null);
+    setAuthLoading(true);
+    try {
+      const { error } = await resetPasswordForEmail(cleanEmail);
+      if (error) {
+        setAuthMessage({
+          type: 'error',
+          text: error.message || 'No se pudo enviar el correo de recuperacion.'
+        });
+        return;
+      }
+      setAuthMessage({
+        type: 'success',
+        text: 'Te enviamos un correo para restablecer tu contrasena.'
+      });
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   async function handleCreateTenant(event) {
     event.preventDefault();
     setTenantError('');
@@ -173,10 +208,10 @@ export default function AuthTenantPanel({
 
   if (!session) {
     return (
-      <section className="pt-4 border-t border-slate-200 space-y-4">
+      <section className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-base font-semibold text-slate-900">
-            Acceso a tu Grupo Scout (Supabase)
+            Ingresar o crear cuenta
           </h3>
           <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100 p-0.5">
             <button
@@ -206,6 +241,16 @@ export default function AuthTenantPanel({
           </div>
         </div>
 
+        {!isSupabaseConfigured && (
+          <div className="p-3 rounded-xl border border-amber-700 bg-amber-100 text-amber-900 text-xs space-y-1">
+            <p className="font-semibold">Backend Supabase pendiente de configuracion</p>
+            <p>
+              Para autenticar usuarios reales agrega <code>VITE_SUPABASE_URL</code> y{' '}
+              <code>VITE_SUPABASE_ANON_KEY</code> en Vercel. Mientras tanto podes probar la app en Modo Demo Local.
+            </p>
+          </div>
+        )}
+
         {inviteCode && (
           <div className="p-3 rounded-xl border border-blue-700 bg-blue-50 text-blue-900 text-xs space-y-1">
             <p className="font-semibold">
@@ -232,6 +277,7 @@ export default function AuthTenantPanel({
                 id="auth-fullname"
                 type="text"
                 required
+                autoComplete="name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Ej. Laura Gomez"
@@ -240,34 +286,67 @@ export default function AuthTenantPanel({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="auth-email" className="block text-sm font-medium text-slate-700 mb-1">
-                Correo institucional
-              </label>
+          <div>
+            <label htmlFor="auth-email" className="block text-sm font-medium text-slate-700 mb-1">
+              Correo electronico
+            </label>
+            <div className="relative">
+              <Mail
+                className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
               <input
                 id="auth-email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="jefatura@gruposcout.org.ar"
-                className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
+                placeholder="nombre@gruposcout.org.ar"
+                className="w-full h-11 pl-10 pr-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
               />
             </div>
-            <div>
-              <label htmlFor="auth-password" className="block text-sm font-medium text-slate-700 mb-1">
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="auth-password" className="block text-sm font-medium text-slate-700">
                 Contrasena
               </label>
+              {authTab === 'login' && (
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  className="text-xs font-semibold text-[#1B365D] hover:underline"
+                >
+                  Olvide mi contrasena
+                </button>
+              )}
+            </div>
+            <div className="relative">
               <input
                 id="auth-password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 minLength={6}
+                autoComplete={authTab === 'signup' ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
+                placeholder="Minimo 6 caracteres"
+                className="w-full h-11 pl-3 pr-11 rounded-lg border border-slate-500 text-base text-slate-900 bg-white"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Ocultar contrasena' : 'Ver contrasena'}
+                className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="w-4 h-4" aria-hidden="true" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -292,7 +371,7 @@ export default function AuthTenantPanel({
           <button
             type="submit"
             disabled={authLoading}
-            className="w-full h-11 inline-flex items-center justify-center gap-2 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {authTab === 'signup' ? (
               <UserPlus className="w-4 h-4" aria-hidden="true" />
@@ -303,8 +382,8 @@ export default function AuthTenantPanel({
               {authLoading
                 ? 'Procesando...'
                 : authTab === 'signup'
-                  ? 'Registrarme y continuar'
-                  : 'Conectar cuenta del Grupo'}
+                  ? 'Crear cuenta'
+                  : 'Iniciar sesion'}
             </span>
           </button>
         </form>

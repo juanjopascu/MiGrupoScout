@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import AppShell from './components/AppShell.jsx';
+import AuthScreen from './components/AuthScreen.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import GroupSettingsModal from './components/GroupSettingsModal.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
@@ -16,6 +17,7 @@ import {
   clearAllOfflineData,
   getCachedCollection,
   getGroupProfile,
+  readLocalPref,
   seedDemoDataIfEmpty,
   writeLocalPref
 } from './services/offlineDb.js';
@@ -65,6 +67,12 @@ export default function App() {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
   const [session, setSession] = useState(null);
+  const [demoBypass, setDemoBypass] = useState(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('invite')) {
+      return false;
+    }
+    return Boolean(readLocalPref(LS_KEYS.DEMO_BYPASS, false));
+  });
   const [groupId, setGroupId] = useState(DEMO_GROUP_ID);
   const [userRole, setUserRole] = useState('jefe_grupo');
   const [memberships, setMemberships] = useState([]);
@@ -312,12 +320,26 @@ export default function App() {
 
   async function handleAuthChanged(nextSession) {
     setSession(nextSession);
+    setDemoBypass(false);
+    writeLocalPref(LS_KEYS.DEMO_BYPASS, false);
     await bootstrap();
+  }
+
+  function handleContinueDemo() {
+    setDemoBypass(true);
+    writeLocalPref(LS_KEYS.DEMO_BYPASS, true);
+  }
+
+  function handleOpenAuthScreen() {
+    setDemoBypass(false);
+    writeLocalPref(LS_KEYS.DEMO_BYPASS, false);
   }
 
   async function handleTenantReady(newGroupId) {
     setPendingInviteCode('');
     savePendingInviteCode('');
+    setDemoBypass(false);
+    writeLocalPref(LS_KEYS.DEMO_BYPASS, false);
     if (newGroupId) {
       writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, newGroupId);
     }
@@ -338,6 +360,7 @@ export default function App() {
     await signOutSupabase();
     await clearAllOfflineData();
     setSession(null);
+    setDemoBypass(false);
     setMemberships([]);
     setUserRole('jefe_grupo');
     setHasActiveGroup(true);
@@ -366,6 +389,24 @@ export default function App() {
   }
 
   const isDemoMode = !session || !isSupabaseConfigured || !hasActiveGroup;
+  const shouldShowAuthScreen =
+    !isLoadingData && !demoBypass && (!session || !hasActiveGroup);
+
+  if (shouldShowAuthScreen) {
+    return (
+      <ErrorBoundary>
+        <AuthScreen
+          session={session}
+          pendingInviteCode={pendingInviteCode}
+          hasActiveGroup={hasActiveGroup}
+          onAuthChanged={handleAuthChanged}
+          onTenantReady={handleTenantReady}
+          onContinueDemo={handleContinueDemo}
+          onLogout={handleLogout}
+        />
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -375,10 +416,12 @@ export default function App() {
         groupProfile={groupProfile}
         userRole={userRole}
         isDemoMode={isDemoMode}
+        isAuthenticated={Boolean(session)}
         isOnline={isOnline}
         pushState={pushState}
         onOpenPushManager={() => setPushModalOpen(true)}
         onOpenTeamManager={() => setTeamModalOpen(true)}
+        onOpenAuthScreen={handleOpenAuthScreen}
         onOpenSettings={() => setSettingsModalOpen(true)}
         syncState={syncState}
         needRefresh={needRefresh}

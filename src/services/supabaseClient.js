@@ -78,6 +78,17 @@ export async function signUpWithEmailPassword(email, password, fullName = '') {
   };
 }
 
+export async function resetPasswordForEmail(email) {
+  if (!supabase) {
+    return {
+      error: new Error('Supabase no esta configurado en este entorno.')
+    };
+  }
+  const redirectTo =
+    typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
+  return supabase.auth.resetPasswordForEmail(email, { redirectTo });
+}
+
 export async function signOutSupabase() {
   if (!supabase) {
     return { error: null };

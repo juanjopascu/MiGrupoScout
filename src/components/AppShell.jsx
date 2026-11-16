@@ -5,6 +5,7 @@ import {
   BookOpenCheck,
   FileText,
   LayoutDashboard,
+  LogIn,
   RefreshCw,
   Settings,
   Shield,
@@ -67,10 +68,12 @@ export default function AppShell({
   groupProfile,
   userRole,
   isDemoMode,
+  isAuthenticated,
   isOnline,
   pushState,
   onOpenPushManager,
   onOpenTeamManager,
+  onOpenAuthScreen,
   onOpenSettings,
   syncState,
   needRefresh,
@@ -146,6 +149,18 @@ export default function AppShell({
             </span>
           </div>
 
+          {!isAuthenticated && onOpenAuthScreen && (
+            <button
+              type="button"
+              onClick={onOpenAuthScreen}
+              aria-label="Iniciar sesion con correo y contrasena"
+              className="w-full min-h-[44px] px-3 rounded-lg bg-[#1B365D] hover:bg-[#122643] flex items-center justify-center lg:justify-start gap-3 text-sm font-semibold text-white"
+            >
+              <LogIn className="w-5 h-5 shrink-0" aria-hidden="true" />
+              <span className="hidden lg:inline truncate">Iniciar sesion</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onOpenPushManager}
@@ -212,6 +227,18 @@ export default function AppShell({
                 <WifiOff className="w-4 h-4" aria-hidden="true" />
               )}
             </span>
+
+            {!isAuthenticated && onOpenAuthScreen && (
+              <button
+                type="button"
+                onClick={onOpenAuthScreen}
+                aria-label="Iniciar sesion"
+                className="h-9 px-2.5 inline-flex items-center justify-center gap-1 rounded-lg bg-[#1B365D] text-white text-xs font-semibold"
+              >
+                <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Ingresar</span>
+              </button>
+            )}
 
             <button
               type="button"
