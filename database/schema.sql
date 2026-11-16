@@ -612,7 +612,7 @@ CREATE OR REPLACE FUNCTION create_group_invitation(
 RETURNS group_invitations
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_user_id uuid := auth.uid();
@@ -1230,7 +1230,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 STABLE
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT
     kb.id,
@@ -1588,3 +1588,6 @@ FROM auth.users
 WHERE lower(email) = 'juanjo.pascuzzi@gmail.com'
 ON CONFLICT (user_id) DO UPDATE SET
   email = EXCLUDED.email;
+
+-- Recargar schema cache de PostgREST inmediatamente
+NOTIFY pgrst, 'reload schema';
