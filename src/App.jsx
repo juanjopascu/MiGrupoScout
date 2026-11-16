@@ -342,6 +342,8 @@ export default function App() {
   function handleOpenAuthScreen() {
     setDemoBypass(false);
     writeLocalPref(LS_KEYS.DEMO_BYPASS, false);
+    setSettingsModalOpen(false);
+    setTeamModalOpen(false);
   }
 
   async function handleTenantReady(newGroupId) {
@@ -528,6 +530,7 @@ export default function App() {
                 onOpenPushManager={() => setPushModalOpen(true)}
                 onOpenTeamManager={() => setTeamModalOpen(true)}
                 onOpenSettings={() => setSettingsModalOpen(true)}
+                onExitDemo={handleOpenAuthScreen}
                 onOpenCampPlanner={(campId) => {
                   setSelectedCampId(campId);
                   handleSelectTab('campamentos');
@@ -621,6 +624,7 @@ export default function App() {
         networkOnline={isOnline}
         manualOffline={manualOffline}
         onToggleManualOffline={handleToggleManualOffline}
+        onExitDemo={handleOpenAuthScreen}
       />
     </ErrorBoundary>
   );

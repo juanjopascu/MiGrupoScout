@@ -49,7 +49,8 @@ export default function GroupSettingsModal({
   isOnline,
   networkOnline = true,
   manualOffline = false,
-  onToggleManualOffline
+  onToggleManualOffline,
+  onExitDemo
 }) {
   const [number, setNumber] = useState(String(groupProfile?.number || 412));
   const [name, setName] = useState(groupProfile?.name || '');
@@ -294,6 +295,17 @@ export default function GroupSettingsModal({
                         ? `Aplicar ${syncState.pendingCount} cambio(s)`
                         : 'Sincronizar ahora'}
                   </span>
+                </button>
+              )}
+
+              {isDemoMode && onExitDemo && (
+                <button
+                  type="button"
+                  onClick={onExitDemo}
+                  className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-red-700 text-red-900 bg-red-50 hover:bg-red-100 text-sm font-semibold"
+                >
+                  <LogOut className="w-4 h-4" aria-hidden="true" />
+                  <span>Salir de la demo</span>
                 </button>
               )}
             </div>

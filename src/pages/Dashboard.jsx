@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ClipboardList, FileSpreadsheet, Palette, Plus, Users } from 'lucide-react';
+import { ClipboardList, FileSpreadsheet, LogOut, Palette, Plus, Users } from 'lucide-react';
 import GroupLogoBadge from '../components/GroupLogoBadge.jsx';
 import MemberCsvImportModal from '../components/MemberCsvImportModal.jsx';
 import {
@@ -31,6 +31,7 @@ export default function Dashboard({
   onOpenPushManager,
   onOpenTeamManager,
   onOpenSettings,
+  onExitDemo,
   onOpenCampPlanner,
   onSaveTask,
   onDeleteTask,
@@ -103,6 +104,16 @@ export default function Dashboard({
               >
                 {isDemoMode ? 'Demo Local' : getRoleLabel(userRole)}
               </span>
+              {isDemoMode && onExitDemo && (
+                <button
+                  type="button"
+                  onClick={onExitDemo}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold border border-red-700 bg-red-50 hover:bg-red-100 text-red-900 inline-flex items-center gap-1"
+                >
+                  <LogOut className="w-3 h-3" aria-hidden="true" />
+                  <span>Salir de la demo</span>
+                </button>
+              )}
               {canCustomizeBranding && onOpenSettings && (
                 <button
                   type="button"

@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   LogIn,
+  LogOut,
   RefreshCw,
   Settings,
   Tent,
@@ -220,15 +221,21 @@ export default function AppShell({
             </button>
           )}
 
-          {!isAuthenticated && onOpenAuthScreen && (
+          {(isDemoMode || !isAuthenticated) && onOpenAuthScreen && (
             <button
               type="button"
               onClick={onOpenAuthScreen}
-              aria-label="Iniciar sesion con correo y contrasena"
+              aria-label={isDemoMode ? 'Salir de la demo local' : 'Iniciar sesion con correo y contrasena'}
               className="w-full min-h-[44px] px-3 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] flex items-center justify-center lg:justify-start gap-3 text-sm font-semibold text-white"
             >
-              <LogIn className="w-5 h-5 shrink-0" aria-hidden="true" />
-              <span className="hidden lg:inline truncate">Iniciar sesion</span>
+              {isDemoMode ? (
+                <LogOut className="w-5 h-5 shrink-0" aria-hidden="true" />
+              ) : (
+                <LogIn className="w-5 h-5 shrink-0" aria-hidden="true" />
+              )}
+              <span className="hidden lg:inline truncate">
+                {isDemoMode ? 'Salir de la demo' : 'Iniciar sesion'}
+              </span>
             </button>
           )}
 
@@ -331,15 +338,19 @@ export default function AppShell({
               </button>
             )}
 
-            {!isAuthenticated && onOpenAuthScreen && (
+            {(isDemoMode || !isAuthenticated) && onOpenAuthScreen && (
               <button
                 type="button"
                 onClick={onOpenAuthScreen}
-                aria-label="Iniciar sesion"
+                aria-label={isDemoMode ? 'Salir de la demo' : 'Iniciar sesion'}
                 className="h-9 px-2.5 inline-flex items-center justify-center gap-1 rounded-lg bg-[var(--brand-primary)] text-white text-xs font-semibold"
               >
-                <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Ingresar</span>
+                {isDemoMode ? (
+                  <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                ) : (
+                  <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
+                )}
+                <span>{isDemoMode ? 'Salir demo' : 'Ingresar'}</span>
               </button>
             )}
 
