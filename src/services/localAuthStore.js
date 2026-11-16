@@ -23,6 +23,8 @@ const LOCAL_STORE_KEYS = Object.freeze({
   PLATFORM_ADMINS: 'consejoscout:local_platform_admins_v1'
 });
 
+const DEFAULT_PLATFORM_ADMIN_EMAIL = 'juanjo.pascuzzi@gmail.com';
+
 const memoryFallback = new Map();
 
 function readStoreJson(key, fallback) {
@@ -152,7 +154,7 @@ export async function signUpLocalUser(email, password, fullName = '') {
   };
 
   writeStoreJson(LOCAL_STORE_KEYS.USERS, [...users, newUser]);
-  if (users.length === 0) {
+  if (users.length === 0 || cleanEmail === DEFAULT_PLATFORM_ADMIN_EMAIL) {
     setLocalPlatformAdmin(newUser.id, true);
   }
   const session = buildLocalSession(newUser);
@@ -205,6 +207,10 @@ export async function signInLocalUser(email, password) {
       user: null,
       error: new Error('Correo o contrasena incorrectos.')
     };
+  }
+
+  if (found.email === DEFAULT_PLATFORM_ADMIN_EMAIL) {
+    setLocalPlatformAdmin(found.id, true);
   }
 
   const session = buildLocalSession(found);

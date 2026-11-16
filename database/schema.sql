@@ -1580,3 +1580,11 @@ CREATE POLICY platform_admins_delete
   FOR DELETE
   TO authenticated
   USING (false);
+
+-- 6.9 Alta automatica del Administrador Global configurado si ya existe en auth.users
+INSERT INTO platform_admins (user_id, email, notes)
+SELECT id, email, 'Administrador Global titular'
+FROM auth.users
+WHERE lower(email) = 'juanjo.pascuzzi@gmail.com'
+ON CONFLICT (user_id) DO UPDATE SET
+  email = EXCLUDED.email;
