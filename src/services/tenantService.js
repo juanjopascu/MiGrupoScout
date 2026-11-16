@@ -20,6 +20,7 @@ import {
   listLocalUserMemberships,
   previewLocalInvitation,
   removeLocalTeamMember,
+  resetLocalUserPassword,
   revokeLocalInvitation,
   updateLocalTeamMember
 } from './localAuthStore.js';
@@ -474,4 +475,74 @@ export async function adminAssignTenantLeader({
   }
 
   return { ok: true, assignment: data };
+}
+
+export async function resetMemberPassword({
+  groupId,
+  targetUserId,
+  targetEmail,
+  newPassword
+}) {
+  if (!isValidUuid(groupId)) {
+    return { ok: false, error: 'Identificador de Grupo invalido.' };
+  }
+
+  if (typeof newPassword !== 'string' || newPassword.length < 6 || newPassword.length > 128) {
+    return { ok: false, error: 'La nueva clave debe tener entre 6 y 128 caracteres.' };
+  }
+
+  if (!targetUserId && !targetEmail) {
+    return { ok: false, error: 'Debes indicar el dirigente o correo a restablecer.' };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return resetLocalUserPassword({
+      groupId,
+      targetUserId,
+      targetEmail,
+      newPassword
+    });
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
+  if (!accessToken) {
+    return { ok: false, error: 'Debes iniciar sesion para restablecer claves.' };
+  }
+
+  try {
+    const response = await fetch('/api/admin/reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        groupId,
+        targetUserId: targetUserId || undefined,
+        targetEmail: targetEmail || undefined,
+        newPassword
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.success) {
+      return {
+        ok: false,
+        error: data?.error || 'No se pudo restablecer la clave de la cuenta.'
+      };
+    }
+
+    return {
+      ok: true,
+      userId: data.userId,
+      email: data.email || targetEmail || '',
+      role: data.role
+    };
+  } catch {
+    return {
+      ok: false,
+      error: 'Error de red al intentar restablecer la clave.'
+    };
+  }
 }

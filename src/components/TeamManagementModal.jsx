@@ -23,6 +23,7 @@ import {
   canInviteTargetRole,
   canManageInvitations,
   canManageTeamRoles,
+  generateTemporaryPassword,
   getRoleLabel
 } from '../domain/roles.js';
 import { BRANCHES } from '../domain/saacRulesConstants.js';
@@ -31,6 +32,7 @@ import {
   listGroupInvitations,
   listGroupTeamMembers,
   removeTeamMember,
+  resetMemberPassword,
   revokeGroupInvitation,
   updateTeamMemberRole
 } from '../services/tenantService.js';
@@ -43,6 +45,7 @@ export default function TeamManagementModal({
   groupProfile,
   userRole,
   currentUserId,
+  isPlatformAdmin = false,
   isDemoMode
 }) {
   const [activeTab, setActiveTab] = useState('team');
@@ -52,6 +55,9 @@ export default function TeamManagementModal({
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [copiedId, setCopiedId] = useState('');
+  const [resetTargetMemberId, setResetTargetMemberId] = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   const [inviteForm, setInviteForm] = useState({
     role: 'educador',
@@ -164,6 +170,33 @@ export default function TeamManagementModal({
     }
     setTeamMembers((prev) => prev.filter((m) => m.id !== membership.id));
     setFeedback({ type: 'info', text: 'Dirigente desvinculado del Grupo.' });
+  }
+
+  async function handleResetMemberPassword(event, membership) {
+    event.preventDefault();
+    setFeedback(null);
+    setResetSubmitting(true);
+    try {
+      const res = await resetMemberPassword({
+        groupId,
+        targetUserId: membership.user_id,
+        targetEmail: membership.member_email,
+        newPassword: resetPasswordValue
+      });
+      if (!res.ok) {
+        setFeedback({ type: 'error', text: res.error });
+        return;
+      }
+      const appliedPass = resetPasswordValue;
+      setResetTargetMemberId(null);
+      setResetPasswordValue('');
+      setFeedback({
+        type: 'success',
+        text: `Clave actualizada para ${cleanUserText(membership.display_name || membership.member_email || 'el dirigente')}. Clave temporal: ${appliedPass}`
+      });
+    } finally {
+      setResetSubmitting(false);
+    }
   }
 
   async function handleCreateInvite(event) {
@@ -347,72 +380,140 @@ export default function TeamManagementModal({
                     <div className="space-y-2.5">
                       {filteredTeam.map((member) => {
                         const isSelf = member.user_id === currentUserId;
+                        const canResetThisMember =
+                          (canEditRoles || isPlatformAdmin) &&
+                          !isSelf &&
+                          (isPlatformAdmin || member.role !== 'jefe_grupo');
+                        const isResettingThisMember = resetTargetMemberId === member.id;
                         return (
                           <div
                             key={member.id}
-                            className="p-3 rounded-xl border border-slate-300 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                            className="p-3 rounded-xl border border-slate-300 bg-slate-50 space-y-2.5"
                           >
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-900 truncate">
-                                {cleanUserText(member.display_name || member.member_email || 'Dirigente')}
-                                {isSelf ? ' (Vos)' : ''}
-                              </p>
-                              {member.member_email && (
-                                <p className="text-xs text-slate-600 truncate">
-                                  {cleanUserText(member.member_email)}
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-slate-900 truncate">
+                                  {cleanUserText(member.display_name || member.member_email || 'Dirigente')}
+                                  {isSelf ? ' (Vos)' : ''}
                                 </p>
+                                {member.member_email && (
+                                  <p className="text-xs text-slate-600 truncate">
+                                    {cleanUserText(member.member_email)}
+                                  </p>
+                                )}
+                              </div>
+
+                              {canEditRoles || isPlatformAdmin ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <select
+                                    aria-label={`Rol de ${member.display_name || 'dirigente'}`}
+                                    value={member.role}
+                                    disabled={isSelf && member.role === 'jefe_grupo'}
+                                    onChange={(e) => handleRoleChange(member, e.target.value)}
+                                    className="h-10 px-2.5 rounded-lg border border-slate-400 text-xs font-semibold text-slate-900 bg-white disabled:opacity-60"
+                                  >
+                                    {GROUP_ROLES.map((r) => (
+                                      <option key={r} value={r}>
+                                        {getRoleLabel(r)}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  <select
+                                    aria-label={`Rama de ${member.display_name || 'dirigente'}`}
+                                    value={member.branch || 'jefatura'}
+                                    onChange={(e) => handleBranchChange(member, e.target.value)}
+                                    className="h-10 px-2.5 rounded-lg border border-slate-400 text-xs font-medium text-slate-900 bg-white"
+                                  >
+                                    {ASSIGNABLE_TEAM_BRANCHES.map((b) => (
+                                      <option key={b} value={b}>
+                                        {BRANCHES[b]?.label || 'Jefatura'}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  {canResetThisMember && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isResettingThisMember) {
+                                          setResetTargetMemberId(null);
+                                          setResetPasswordValue('');
+                                        } else {
+                                          setResetTargetMemberId(member.id);
+                                          setResetPasswordValue(generateTemporaryPassword(8));
+                                        }
+                                      }}
+                                      aria-label={`Resetear clave de ${member.display_name || 'dirigente'}`}
+                                      className="h-10 px-2.5 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-800"
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5 text-[var(--brand-primary)]" aria-hidden="true" />
+                                      <span>Reset clave</span>
+                                    </button>
+                                  )}
+
+                                  {!isSelf && (isPlatformAdmin || member.role !== 'jefe_grupo') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveMember(member)}
+                                      aria-label={`Quitar a ${member.display_name || 'dirigente'}`}
+                                      className="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg text-red-700 hover:bg-red-100"
+                                    >
+                                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="px-2.5 py-1 rounded-full border border-slate-400 bg-white font-semibold text-slate-800">
+                                    {getRoleLabel(member.role)}
+                                  </span>
+                                  <span className="px-2.5 py-1 rounded-full border border-slate-300 bg-white text-slate-700">
+                                    {BRANCHES[member.branch]?.label || 'Jefatura'}
+                                  </span>
+                                </div>
                               )}
                             </div>
 
-                            {canEditRoles ? (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <select
-                                  aria-label={`Rol de ${member.display_name || 'dirigente'}`}
-                                  value={member.role}
-                                  disabled={isSelf && member.role === 'jefe_grupo'}
-                                  onChange={(e) => handleRoleChange(member, e.target.value)}
-                                  className="h-10 px-2.5 rounded-lg border border-slate-400 text-xs font-semibold text-slate-900 bg-white disabled:opacity-60"
+                            {isResettingThisMember && (
+                              <form
+                                onSubmit={(e) => handleResetMemberPassword(e, member)}
+                                className="pt-2.5 border-t border-slate-200 flex flex-wrap items-center gap-2"
+                              >
+                                <input
+                                  type="text"
+                                  required
+                                  minLength={6}
+                                  value={resetPasswordValue}
+                                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                                  placeholder="Nueva clave temporal (min. 6 caracteres)"
+                                  className="flex-1 min-w-[200px] h-9 px-3 rounded-lg border border-slate-400 bg-white text-xs font-mono text-slate-900"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setResetPasswordValue(generateTemporaryPassword(8))}
+                                  className="h-9 px-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700"
                                 >
-                                  {GROUP_ROLES.map((r) => (
-                                    <option key={r} value={r}>
-                                      {getRoleLabel(r)}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                <select
-                                  aria-label={`Rama de ${member.display_name || 'dirigente'}`}
-                                  value={member.branch || 'jefatura'}
-                                  onChange={(e) => handleBranchChange(member, e.target.value)}
-                                  className="h-10 px-2.5 rounded-lg border border-slate-400 text-xs font-medium text-slate-900 bg-white"
+                                  Generar
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={resetSubmitting || resetPasswordValue.length < 6}
+                                  className="h-9 px-3 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-xs font-semibold disabled:opacity-50"
                                 >
-                                  {ASSIGNABLE_TEAM_BRANCHES.map((b) => (
-                                    <option key={b} value={b}>
-                                      {BRANCHES[b]?.label || 'Jefatura'}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                {!isSelf && member.role !== 'jefe_grupo' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveMember(member)}
-                                    aria-label={`Quitar a ${member.display_name || 'dirigente'}`}
-                                    className="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg text-red-700 hover:bg-red-100"
-                                  >
-                                    <Trash2 className="w-4 h-4" aria-hidden="true" />
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="px-2.5 py-1 rounded-full border border-slate-400 bg-white font-semibold text-slate-800">
-                                  {getRoleLabel(member.role)}
-                                </span>
-                                <span className="px-2.5 py-1 rounded-full border border-slate-300 bg-white text-slate-700">
-                                  {BRANCHES[member.branch]?.label || 'Jefatura'}
-                                </span>
-                              </div>
+                                  {resetSubmitting ? 'Guardando...' : 'Aplicar clave'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setResetTargetMemberId(null);
+                                    setResetPasswordValue('');
+                                  }}
+                                  className="h-9 px-2.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-600"
+                                >
+                                  Cancelar
+                                </button>
+                              </form>
                             )}
                           </div>
                         );

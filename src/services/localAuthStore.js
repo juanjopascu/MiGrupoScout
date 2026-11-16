@@ -659,7 +659,8 @@ export function adminListAllLocalTenants() {
         team_count: activeTeam.length,
         members_count: 0,
         jefe_name: jefe?.display_name || null,
-        jefe_email: jefe?.member_email || null
+        jefe_email: jefe?.member_email || null,
+        jefe_user_id: jefe?.user_id || null
       };
     });
 
@@ -815,5 +816,97 @@ export function adminAssignLocalTenantLeader({
       branch: nextBranch,
       display_name: foundUser.fullName
     }
+  };
+}
+
+export async function resetLocalUserPassword({
+  groupId,
+  targetUserId,
+  targetEmail,
+  newPassword
+}) {
+  const session = getLocalSession();
+  if (!session?.user?.id) {
+    return { ok: false, error: 'Autenticacion requerida para restablecer claves.' };
+  }
+
+  if (typeof newPassword !== 'string' || newPassword.length < 6 || newPassword.length > 128) {
+    return { ok: false, error: 'La nueva clave debe tener entre 6 y 128 caracteres.' };
+  }
+
+  const isPlatformAdmin = isLocalPlatformAdmin(session.user.id, session.user.email);
+  const memberships = readStoreJson(LOCAL_STORE_KEYS.MEMBERSHIPS, []);
+
+  if (!isPlatformAdmin) {
+    const isJefe = memberships.some(
+      (m) =>
+        m.group_id === groupId &&
+        m.user_id === session.user.id &&
+        m.role === 'jefe_grupo' &&
+        m.is_active !== false
+    );
+    if (!isJefe) {
+      return {
+        ok: false,
+        error: 'Solo el Jefe de Grupo o el Administrador Global pueden restablecer claves.'
+      };
+    }
+  }
+
+  const cleanEmail = sanitizeString(targetEmail || '', { maxLength: 160 }).toLowerCase();
+  const targetMembership = memberships.find(
+    (m) =>
+      m.group_id === groupId &&
+      m.is_active !== false &&
+      ((targetUserId && m.user_id === targetUserId) ||
+        (cleanEmail && m.member_email?.toLowerCase() === cleanEmail))
+  );
+
+  if (!targetMembership) {
+    return {
+      ok: false,
+      error: 'No se encontro a ese dirigente activo dentro del Grupo Scout indicado.'
+    };
+  }
+
+  const users = readStoreJson(LOCAL_STORE_KEYS.USERS, []);
+  const targetUser = users.find((u) => u.id === targetMembership.user_id);
+  if (!targetUser) {
+    return { ok: false, error: 'Cuenta de usuario no encontrada.' };
+  }
+
+  if (
+    isLocalPlatformAdmin(targetUser.id, targetUser.email) &&
+    targetUser.id !== session.user.id
+  ) {
+    return {
+      ok: false,
+      error: 'No esta permitido restablecer la clave de un Administrador de plataforma.'
+    };
+  }
+
+  if (!isPlatformAdmin) {
+    if (targetUser.id === session.user.id || targetMembership.role === 'jefe_grupo') {
+      return {
+        ok: false,
+        error: 'El Jefe de Grupo solo puede restablecer cuentas de sus invitados (Subjefe, Jefe de Rama o Educador).'
+      };
+    }
+  }
+
+  const nextSalt = generateSaltHex();
+  const nextHash = await hashPasswordWithSalt(newPassword, nextSalt);
+  writeStoreJson(
+    LOCAL_STORE_KEYS.USERS,
+    users.map((u) =>
+      u.id === targetUser.id ? { ...u, passwordSalt: nextSalt, passwordHash: nextHash } : u
+    )
+  );
+
+  return {
+    ok: true,
+    userId: targetUser.id,
+    email: targetUser.email,
+    role: targetMembership.role
   };
 }

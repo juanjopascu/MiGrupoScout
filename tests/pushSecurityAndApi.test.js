@@ -17,6 +17,7 @@ vi.mock('../api/_lib/pushDispatcher.js', () => ({
 
 import sendHandler from '../api/push/send.js';
 import checkRemindersHandler from '../api/push/check-reminders.js';
+import resetPasswordHandler from '../api/admin/reset-password.js';
 
 function createMockRes() {
   const res = {
@@ -617,5 +618,157 @@ describe('API integration - /api/push/check-reminders', () => {
     expect(res.body.data.groupsEvaluated).toBe(2);
     expect(res.body.data.notificationsSent).toBe(2);
     expect(mockDispatchPushNotifications).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('api/admin/reset-password - control jerarquico multi-tenant', () => {
+  const groupA = '11111111-1111-4111-8111-111111111111';
+  const adminId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const jefeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const educadorId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rechaza peticiones sin token Bearer con 401', async () => {
+    const req = { method: 'POST', headers: {}, body: { groupId: groupA } };
+    const res = createMockRes();
+    await resetPasswordHandler(req, res);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('impide que un Educador o un Jefe reseteen claves fuera de su jerarquia (403)', async () => {
+    const updateUserById = vi.fn();
+    mockGetSupabaseAdmin.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: jefeId } }, error: null }),
+        admin: { updateUserById }
+      },
+      from: vi.fn((table) => {
+        if (table === 'platform_admins') {
+          return createQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'group_memberships') {
+          // Primera llamada: caller es jefe_grupo; segunda: target tambien es jefe_grupo
+          return createQueryBuilder({
+            data: { id: 'm1', user_id: adminId, role: 'jefe_grupo', member_email: 'otro@scout.org' },
+            error: null
+          });
+        }
+        return createQueryBuilder({ data: null, error: null });
+      })
+    });
+
+    const req = {
+      method: 'POST',
+      headers: { authorization: 'Bearer valid-token' },
+      body: {
+        groupId: groupA,
+        targetUserId: adminId,
+        newPassword: 'Temporal2026'
+      }
+    };
+    const res = createMockRes();
+    await resetPasswordHandler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
+
+  it('permite al Jefe de Grupo restablecer la clave de un invitado de su propio grupo', async () => {
+    const updateUserById = vi.fn().mockResolvedValue({ data: {}, error: null });
+    let gmCalls = 0;
+
+    mockGetSupabaseAdmin.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: jefeId } }, error: null }),
+        admin: { updateUserById }
+      },
+      from: vi.fn((table) => {
+        if (table === 'platform_admins') {
+          return createQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'group_memberships') {
+          gmCalls += 1;
+          if (gmCalls === 1) {
+            return createQueryBuilder({ data: { id: 'mj', role: 'jefe_grupo' }, error: null });
+          }
+          return createQueryBuilder({
+            data: {
+              id: 'me',
+              user_id: educadorId,
+              role: 'educador',
+              member_email: 'educador@scout.org',
+              display_name: 'Educador Uno'
+            },
+            error: null
+          });
+        }
+        return createQueryBuilder({ data: null, error: null });
+      })
+    });
+
+    const req = {
+      method: 'POST',
+      headers: { authorization: 'Bearer valid-token' },
+      body: {
+        groupId: groupA,
+        targetUserId: educadorId,
+        newPassword: 'CS-Temporal99'
+      }
+    };
+    const res = createMockRes();
+    await resetPasswordHandler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(updateUserById).toHaveBeenCalledWith(educadorId, { password: 'CS-Temporal99' });
+  });
+
+  it('permite al Administrador Global restablecer la clave del Jefe de Grupo', async () => {
+    const updateUserById = vi.fn().mockResolvedValue({ data: {}, error: null });
+    let paCalls = 0;
+
+    mockGetSupabaseAdmin.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: adminId } }, error: null }),
+        admin: { updateUserById }
+      },
+      from: vi.fn((table) => {
+        if (table === 'platform_admins') {
+          paCalls += 1;
+          // 1a llamada: caller IS platform_admin; 2a llamada: target is NOT platform_admin
+          return createQueryBuilder({
+            data: paCalls === 1 ? { user_id: adminId } : null,
+            error: null
+          });
+        }
+        if (table === 'group_memberships') {
+          return createQueryBuilder({
+            data: {
+              id: 'mj',
+              user_id: jefeId,
+              role: 'jefe_grupo',
+              member_email: 'jefe@scout.org'
+            },
+            error: null
+          });
+        }
+        return createQueryBuilder({ data: null, error: null });
+      })
+    });
+
+    const req = {
+      method: 'POST',
+      headers: { authorization: 'Bearer admin-token' },
+      body: {
+        groupId: groupA,
+        targetEmail: 'jefe@scout.org',
+        newPassword: 'CS-AdminReset1'
+      }
+    };
+    const res = createMockRes();
+    await resetPasswordHandler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(updateUserById).toHaveBeenCalledWith(jefeId, { password: 'CS-AdminReset1' });
   });
 });

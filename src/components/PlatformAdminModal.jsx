@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Building2,
   Edit3,
+  KeyRound,
   LogIn,
   Plus,
   RefreshCw,
@@ -16,6 +17,7 @@ import {
 import {
   ASSIGNABLE_TEAM_BRANCHES,
   GROUP_ROLES,
+  generateTemporaryPassword,
   getRoleLabel
 } from '../domain/roles.js';
 import { BRANCHES } from '../domain/saacRulesConstants.js';
@@ -25,7 +27,8 @@ import {
   adminListAllTenants,
   adminUpdateTenant,
   createScoutGroupTenant,
-  deleteScoutGroupTenant
+  deleteScoutGroupTenant,
+  resetMemberPassword
 } from '../services/tenantService.js';
 import GroupLogoBadge from './GroupLogoBadge.jsx';
 
@@ -78,6 +81,8 @@ export function PlatformAdminModal({
   });
 
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [resetGroupId, setResetGroupId] = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [busyKey, setBusyKey] = useState(null);
 
   const loadTenants = useCallback(async () => {
@@ -101,6 +106,8 @@ export function PlatformAdminModal({
     setEditingGroupId(null);
     setAssignGroupId(null);
     setDeleteTargetId(null);
+    setResetGroupId(null);
+    setResetPasswordValue('');
     void loadTenants();
   }, [isOpen, loadTenants]);
 
@@ -204,6 +211,33 @@ export function PlatformAdminModal({
       text: `Se asigno el rol ${getRoleLabel(res.assignment.role)} a ${res.assignment.email}.`
     });
     await loadTenants();
+  };
+
+  const handleResetJefePassword = async (e, tenant) => {
+    e.preventDefault();
+    setBusyKey(`reset:${tenant.id}`);
+    setFeedback(null);
+
+    const res = await resetMemberPassword({
+      groupId: tenant.id,
+      targetUserId: tenant.jefe_user_id || undefined,
+      targetEmail: tenant.jefe_email || undefined,
+      newPassword: resetPasswordValue
+    });
+
+    setBusyKey(null);
+    if (!res.ok) {
+      setFeedback({ type: 'error', text: res.error });
+      return;
+    }
+
+    const applied = resetPasswordValue;
+    setResetGroupId(null);
+    setResetPasswordValue('');
+    setFeedback({
+      type: 'success',
+      text: `Clave restablecida para Jefatura de #${tenant.number} (${res.email || tenant.jefe_name}). Clave temporal: ${applied}`
+    });
   };
 
   const handleDeleteTenant = async (tenant) => {
@@ -479,7 +513,9 @@ export function PlatformAdminModal({
                 const isCurrent = tenant.id === activeGroupId;
                 const isEditing = editingGroupId === tenant.id;
                 const isAssigning = assignGroupId === tenant.id;
+                const isResetting = resetGroupId === tenant.id;
                 const isDeleting = deleteTargetId === tenant.id;
+                const hasJefe = Boolean(tenant.jefe_user_id || tenant.jefe_email);
 
                 return (
                   <div
@@ -560,6 +596,7 @@ export function PlatformAdminModal({
                             setAssignGroupId(isAssigning ? null : tenant.id);
                             setEditingGroupId(null);
                             setDeleteTargetId(null);
+                            setResetGroupId(null);
                             setAssignForm({
                               targetEmail: '',
                               role: 'jefe_grupo',
@@ -571,12 +608,34 @@ export function PlatformAdminModal({
                           <UserPlus className="w-3.5 h-3.5" />
                           Asignar Jefe
                         </button>
+                        {hasJefe && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isResetting) {
+                                setResetGroupId(null);
+                                setResetPasswordValue('');
+                              } else {
+                                setResetGroupId(tenant.id);
+                                setEditingGroupId(null);
+                                setAssignGroupId(null);
+                                setDeleteTargetId(null);
+                                setResetPasswordValue(generateTemporaryPassword(8));
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            Reset clave Jefe
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
                             setDeleteTargetId(isDeleting ? null : tenant.id);
                             setEditingGroupId(null);
                             setAssignGroupId(null);
+                            setResetGroupId(null);
                           }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-semibold text-white transition-colors"
                         >
@@ -711,6 +770,52 @@ export function PlatformAdminModal({
                               {busyKey === `assign:${tenant.id}` ? 'Asignando...' : 'Confirmar asignacion'}
                             </button>
                           </div>
+                        </div>
+                      </form>
+                    )}
+
+                    {isResetting && (
+                      <form
+                        onSubmit={(e) => handleResetJefePassword(e, tenant)}
+                        className="pt-3 border-t border-slate-100 space-y-2"
+                      >
+                        <p className="text-xs font-medium text-slate-700">
+                          Restablecer clave del Jefe de Grupo ({tenant.jefe_email || tenant.jefe_name}):
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="text"
+                            required
+                            minLength={6}
+                            value={resetPasswordValue}
+                            onChange={(e) => setResetPasswordValue(e.target.value)}
+                            placeholder="Nueva clave temporal (min. 6 caracteres)"
+                            className="flex-1 min-w-[200px] px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setResetPasswordValue(generateTemporaryPassword(8))}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+                          >
+                            Generar
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={busyKey === `reset:${tenant.id}` || resetPasswordValue.length < 6}
+                            className="px-3 py-1.5 text-xs rounded-lg bg-[var(--brand-primary)] text-white font-semibold disabled:opacity-50"
+                          >
+                            {busyKey === `reset:${tenant.id}` ? 'Guardando...' : 'Aplicar clave'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setResetGroupId(null);
+                              setResetPasswordValue('');
+                            }}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-600"
+                          >
+                            Cancelar
+                          </button>
                         </div>
                       </form>
                     )}

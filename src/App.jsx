@@ -672,6 +672,7 @@ export default function App() {
         groupProfile={groupProfile}
         userRole={userRole}
         currentUserId={session?.user?.id || null}
+        isPlatformAdmin={isPlatformAdmin}
         isDemoMode={isDemoMode}
       />
 

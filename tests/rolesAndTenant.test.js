@@ -12,6 +12,7 @@ import {
   canManageInvitations,
   canManageTeamRoles,
   canSendGroupPush,
+  generateTemporaryPassword,
   getRoleLabel,
   normalizeInviteCode,
   validateGroupTenantInput,
@@ -38,6 +39,7 @@ import {
   listLocalGroupTeam,
   listLocalUserMemberships,
   previewLocalInvitation,
+  resetLocalUserPassword,
   signInLocalUser,
   signOutLocalUser,
   signUpLocalUser
@@ -427,5 +429,47 @@ describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () =>
     const adminDelete = deleteLocalGroupTenant(g777.group.id, 777);
     expect(adminDelete.ok).toBe(true);
     expect(adminListAllLocalTenants().tenants.map((t) => t.number)).toEqual([556]);
+
+    // Generacion de clave temporal y reseteo de claves jerarquico
+    const tempPass = generateTemporaryPassword(8);
+    expect(tempPass).toMatch(/^CS-[A-Za-z0-9]{8}$/);
+
+    // Admin Global resetea la clave del Jefe de Grupo 556 (jefe555)
+    const adminResetJefe = await resetLocalUserPassword({
+      groupId: g555.group.id,
+      targetEmail: 'jefe555@gruposcout.org.ar',
+      newPassword: tempPass
+    });
+    expect(adminResetJefe.ok).toBe(true);
+
+    // jefe555 ya no ingresa con clave anterior y si con la nueva
+    expect((await signInLocalUser('jefe555@gruposcout.org.ar', 'claveSegura789')).error).not.toBeNull();
+    expect((await signInLocalUser('jefe555@gruposcout.org.ar', tempPass)).error).toBeNull();
+
+    // Se asigna a educador1 como educador de 556 para probar reset por parte del Jefe de Grupo
+    await signInLocalUser('juanjo.pascuzzi@gmail.com', 'claveSeguraAdmin123');
+    await adminAssignLocalTenantLeader({
+      groupId: g555.group.id,
+      targetEmail: 'educador1@gruposcout.org.ar',
+      role: 'educador',
+      branch: 'manada'
+    });
+
+    await signInLocalUser('jefe555@gruposcout.org.ar', tempPass);
+    const jefeResetEducador = await resetLocalUserPassword({
+      groupId: g555.group.id,
+      targetEmail: 'educador1@gruposcout.org.ar',
+      newPassword: 'NuevaClaveScout2026'
+    });
+    expect(jefeResetEducador.ok).toBe(true);
+
+    // Educador NO puede resetear claves del Jefe de Grupo
+    await signInLocalUser('educador1@gruposcout.org.ar', 'NuevaClaveScout2026');
+    const educadorResetForbidden = await resetLocalUserPassword({
+      groupId: g555.group.id,
+      targetEmail: 'jefe555@gruposcout.org.ar',
+      newPassword: 'HackAttempt123'
+    });
+    expect(educadorResetForbidden.ok).toBe(false);
   });
 });

@@ -868,6 +868,15 @@ BEGIN
           AND gm.is_active = true
         ORDER BY gm.created_at ASC
         LIMIT 1
+      ),
+      'jefe_user_id', (
+        SELECT gm.user_id
+        FROM group_memberships gm
+        WHERE gm.group_id = sg.id
+          AND gm.role = 'jefe_grupo'
+          AND gm.is_active = true
+        ORDER BY gm.created_at ASC
+        LIMIT 1
       )
     ) AS row_obj
     FROM scout_groups sg

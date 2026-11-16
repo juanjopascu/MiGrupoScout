@@ -242,3 +242,22 @@ export function buildInvitationShareText({
   lines.push('Ingresa con tu cuenta o create una nueva y pega el codigo para vincularte al Grupo.');
   return lines.join('\n');
 }
+
+const TEMP_PASSWORD_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+export function generateTemporaryPassword(length = 10) {
+  const safeLength = Math.max(8, Math.min(24, Number(length) || 10));
+  const randomBytes = new Uint8Array(safeLength);
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let i = 0; i < safeLength; i += 1) {
+      randomBytes[i] = (i * 37 + 17) % 256;
+    }
+  }
+  let out = 'CS-';
+  for (let i = 0; i < safeLength; i += 1) {
+    out += TEMP_PASSWORD_CHARSET[randomBytes[i] % TEMP_PASSWORD_CHARSET.length];
+  }
+  return out;
+}
