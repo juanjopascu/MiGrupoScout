@@ -159,9 +159,8 @@ export default function App() {
             activeRemote = true;
           } else {
             await seedDemoDataIfEmpty(true);
-            setSettingsModalOpen(true);
-            if (nextIsPlatformAdmin) {
-              setPlatformAdminOpen(true);
+            if (!nextIsPlatformAdmin) {
+              setSettingsModalOpen(true);
             }
           }
         } else {
@@ -513,9 +512,9 @@ export default function App() {
   }
 
   const effectiveIsOnline = isOnline && !manualOffline;
-  const isDemoMode = !session || !hasActiveGroup;
+  const isDemoMode = !session || (!hasActiveGroup && !isPlatformAdmin);
   const shouldShowAuthScreen =
-    !isLoadingData && !demoBypass && (!session || !hasActiveGroup);
+    !isLoadingData && !demoBypass && (!session || (!hasActiveGroup && !isPlatformAdmin));
 
   if (shouldShowAuthScreen) {
     return (
@@ -551,7 +550,7 @@ export default function App() {
       <AppShell
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
-        groupProfile={groupProfile}
+        groupProfile={isPlatformAdmin && !hasActiveGroup ? null : groupProfile}
         userRole={userRole}
         isDemoMode={isDemoMode}
         isAuthenticated={Boolean(session)}
@@ -587,7 +586,22 @@ export default function App() {
           </div>
         ) : (
           <>
-            {activeTab === 'dashboard' && (
+            {activeTab === 'dashboard' && isPlatformAdmin && !hasActiveGroup && (
+              <div className="space-y-4">
+                <PlatformAdminModal
+                  inline
+                  isOpen
+                  onClose={() => setPlatformAdminOpen(false)}
+                  activeGroupId={groupId}
+                  session={session}
+                  onEnterTenant={handleEnterTenantAsAdmin}
+                  onTenantChanged={(changedId) => bootstrap(changedId || groupId)}
+                  onTenantDeleted={handleAdminTenantDeleted}
+                />
+              </div>
+            )}
+
+            {activeTab === 'dashboard' && (!isPlatformAdmin || hasActiveGroup) && (
               <Dashboard
                 groupProfile={groupProfile}
                 userRole={userRole}

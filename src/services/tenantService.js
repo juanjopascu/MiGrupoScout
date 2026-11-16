@@ -8,6 +8,7 @@ import { isValidUuid } from '../domain/validators.js';
 import {
   acceptLocalInvitation,
   adminAssignLocalTenantLeader,
+  adminGetLocalPlatformStats,
   adminListAllLocalTenants,
   adminUpdateLocalTenant,
   createLocalGroupTenant,
@@ -373,6 +374,29 @@ export async function adminListAllTenants() {
   return {
     ok: true,
     tenants: Array.isArray(data) ? data : []
+  };
+}
+
+export async function adminGetPlatformStats(fallbackTenants = []) {
+  if (!isSupabaseConfigured || !supabase) {
+    return adminGetLocalPlatformStats();
+  }
+
+  const { data, error } = await supabase.rpc('admin_get_platform_stats');
+  if (!error && data && typeof data === 'object') {
+    return { ok: true, stats: data };
+  }
+
+  // Fallback limpio si la funcion SQL aun no fue creada en el proyecto remoto
+  const list = Array.isArray(fallbackTenants) ? fallbackTenants : [];
+  return {
+    ok: true,
+    stats: {
+      total_groups: list.length,
+      registered_accounts: null,
+      active_leaders: list.reduce((acc, t) => acc + (Number(t.team_count) || 0), 0),
+      total_youth_members: list.reduce((acc, t) => acc + (Number(t.members_count) || 0), 0)
+    }
   };
 }
 

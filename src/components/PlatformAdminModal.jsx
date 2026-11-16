@@ -21,6 +21,7 @@ import {
 import { BRANCHES } from '../domain/saacRulesConstants.js';
 import {
   adminAssignTenantLeader,
+  adminGetPlatformStats,
   adminListAllTenants,
   adminUpdateTenant,
   createScoutGroupTenant,
@@ -38,6 +39,7 @@ const ORG_MODELS = [
 export function PlatformAdminModal({
   isOpen,
   onClose,
+  inline = false,
   activeGroupId,
   session,
   onEnterTenant,
@@ -45,6 +47,7 @@ export function PlatformAdminModal({
   onTenantDeleted
 }) {
   const [tenants, setTenants] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [feedback, setFeedback] = useState(null);
@@ -75,7 +78,6 @@ export function PlatformAdminModal({
   });
 
   const [deleteTargetId, setDeleteTargetId] = useState(null);
-  const [deleteConfirmNumber, setDeleteConfirmNumber] = useState('');
   const [busyKey, setBusyKey] = useState(null);
 
   const loadTenants = useCallback(async () => {
@@ -85,6 +87,10 @@ export function PlatformAdminModal({
       setFeedback({ type: 'error', text: res.error });
     } else {
       setTenants(res.tenants);
+      const statsRes = await adminGetPlatformStats(res.tenants);
+      if (statsRes.ok) {
+        setStats(statsRes.stats);
+      }
     }
     setLoading(false);
   }, []);
@@ -95,7 +101,6 @@ export function PlatformAdminModal({
     setEditingGroupId(null);
     setAssignGroupId(null);
     setDeleteTargetId(null);
-    setDeleteConfirmNumber('');
     void loadTenants();
   }, [isOpen, loadTenants]);
 
@@ -201,14 +206,13 @@ export function PlatformAdminModal({
     await loadTenants();
   };
 
-  const handleDeleteTenant = async (e, tenant) => {
-    e.preventDefault();
+  const handleDeleteTenant = async (tenant) => {
     setBusyKey(`delete:${tenant.id}`);
     setFeedback(null);
 
     const res = await deleteScoutGroupTenant({
       groupId: tenant.id,
-      confirmNumber: deleteConfirmNumber
+      confirmNumber: tenant.number
     });
 
     setBusyKey(null);
@@ -218,7 +222,6 @@ export function PlatformAdminModal({
     }
 
     setDeleteTargetId(null);
-    setDeleteConfirmNumber('');
     setFeedback({
       type: 'success',
       text: `Grupo #${tenant.number} - ${tenant.name} eliminado definitivamente.`
@@ -229,23 +232,27 @@ export function PlatformAdminModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-3 sm:p-4">
-      <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-3 bg-slate-50">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)] text-white flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                Administracion Global de Grupos Scout
-              </h2>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Supervisa numeros de Grupo para evitar superposiciones, interviene si un Jefe no puede operar o reasigna responsables.
-              </p>
-            </div>
+  const containerClass = inline
+    ? 'bg-white w-full rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden'
+    : 'bg-white w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden';
+
+  const body = (
+    <div className={containerClass}>
+      <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-3 bg-slate-50">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[var(--brand-primary)] text-white flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
           </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+              Administracion Global de Grupos Scout
+            </h2>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Supervisa numeros de Grupo para evitar superposiciones, consulta uso de la app, administra o elimina Grupos.
+            </p>
+          </div>
+        </div>
+        {!inline && onClose && (
           <button
             type="button"
             onClick={onClose}
@@ -254,7 +261,8 @@ export function PlatformAdminModal({
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
+        )}
+      </div>
 
         <div className="px-5 py-3 border-b border-slate-100 bg-white flex flex-wrap items-center justify-between gap-2.5">
           <div className="relative flex-1 min-w-[220px]">
@@ -295,13 +303,51 @@ export function PlatformAdminModal({
         </div>
 
         <div className="p-5 overflow-y-auto space-y-4 flex-1 bg-slate-50/50">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5">
-            <span>
-              Total registrados: <strong className="text-slate-900">{tenants.length}</strong> Grupo(s)
-            </span>
-            <span>
-              Siguiente numero libre sugerido: <strong className="text-[var(--brand-primary)]">#{nextSuggestedNumber}</strong>
-            </span>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Grupos Scout
+              </p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">
+                {stats?.total_groups ?? tenants.length}
+              </p>
+              <p className="text-[11px] text-[var(--brand-primary)] font-medium mt-0.5">
+                Sig. libre: #{nextSuggestedNumber}
+              </p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Gente usando la app
+              </p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">
+                {stats?.registered_accounts ?? stats?.active_leaders ?? 0}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Cuentas registradas
+              </p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Dirigentes en grupos
+              </p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">
+                {stats?.active_leaders ?? 0}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Con rol activo
+              </p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Integrantes en padrones
+              </p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">
+                {stats?.total_youth_members ?? 0}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Cargados por grupos
+              </p>
+            </div>
           </div>
 
           {feedback && (
@@ -531,12 +577,11 @@ export function PlatformAdminModal({
                             setDeleteTargetId(isDeleting ? null : tenant.id);
                             setEditingGroupId(null);
                             setAssignGroupId(null);
-                            setDeleteConfirmNumber('');
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-700 hover:bg-red-50"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-semibold text-white transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          Eliminar
+                          Eliminar Grupo
                         </button>
                       </div>
                     </div>
@@ -671,48 +716,31 @@ export function PlatformAdminModal({
                     )}
 
                     {isDeleting && (
-                      <form
-                        onSubmit={(e) => handleDeleteTenant(e, tenant)}
-                        className="pt-3 border-t border-red-200 bg-red-50/70 rounded-lg p-3 space-y-2"
-                      >
+                      <div className="pt-3 border-t border-red-200 bg-red-50/70 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-start gap-2 text-xs text-red-800">
                           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
                           <span>
-                            Accion irreversible. Escribe <strong>{tenant.number}</strong> para eliminar #{tenant.number} - {tenant.name} y todos sus registros.
+                            ¿Eliminar definitivamente <strong>#{tenant.number} - {tenant.name}</strong> y todos sus registros?
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            required
-                            value={deleteConfirmNumber}
-                            onChange={(e) => setDeleteConfirmNumber(e.target.value)}
-                            placeholder={`Numero ${tenant.number}`}
-                            className="px-3 py-1.5 text-xs rounded-lg border border-red-300 bg-white w-36"
-                          />
+                        <div className="flex items-center gap-2">
                           <button
-                            type="submit"
-                            disabled={
-                              busyKey === `delete:${tenant.id}` ||
-                              Number.parseInt(deleteConfirmNumber, 10) !== Number(tenant.number)
-                            }
+                            type="button"
+                            onClick={() => void handleDeleteTenant(tenant)}
+                            disabled={busyKey === `delete:${tenant.id}`}
                             className="px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold disabled:opacity-50"
                           >
-                            {busyKey === `delete:${tenant.id}` ? 'Eliminando...' : 'Eliminar definitivamente'}
+                            {busyKey === `delete:${tenant.id}` ? 'Eliminando...' : 'Confirmar eliminacion'}
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setDeleteTargetId(null);
-                              setDeleteConfirmNumber('');
-                            }}
+                            onClick={() => setDeleteTargetId(null)}
                             className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-600"
                           >
                             Cancelar
                           </button>
                         </div>
-                      </form>
+                      </div>
                     )}
                   </div>
                 );
@@ -721,6 +749,15 @@ export function PlatformAdminModal({
           )}
         </div>
       </div>
+  );
+
+  if (inline) {
+    return body;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-3 sm:p-4">
+      {body}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import { parseMembersCsv } from '../src/domain/memberCsvParser.js';
 import {
   acceptLocalInvitation,
   adminAssignLocalTenantLeader,
+  adminGetLocalPlatformStats,
   adminListAllLocalTenants,
   adminUpdateLocalTenant,
   createLocalGroupTenant,
@@ -366,6 +367,11 @@ describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () =>
     const listed = adminListAllLocalTenants();
     expect(listed.ok).toBe(true);
     expect(listed.tenants.map((t) => t.number)).toEqual([555, 777]);
+
+    const stats = adminGetLocalPlatformStats();
+    expect(stats.ok).toBe(true);
+    expect(stats.stats.total_groups).toBe(2);
+    expect(stats.stats.registered_accounts).toBeGreaterThanOrEqual(3);
 
     // Previene superposicion si intenta cambiar el 555 al 777
     const collision = adminUpdateLocalTenant(g555.group.id, {

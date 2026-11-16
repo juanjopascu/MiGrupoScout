@@ -880,6 +880,40 @@ $$;
 REVOKE ALL ON FUNCTION admin_list_all_tenants() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION admin_list_all_tenants() TO authenticated;
 
+CREATE OR REPLACE FUNCTION admin_get_platform_stats()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_groups integer;
+  v_accounts integer;
+  v_leaders integer;
+  v_members integer;
+BEGIN
+  IF NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Acceso restringido al Administrador Global de la plataforma';
+  END IF;
+
+  SELECT count(*)::integer INTO v_groups FROM scout_groups;
+  SELECT count(*)::integer INTO v_accounts FROM auth.users;
+  SELECT count(DISTINCT user_id)::integer INTO v_leaders FROM group_memberships WHERE is_active = true;
+  SELECT count(*)::integer INTO v_members FROM group_members WHERE is_active = true;
+
+  RETURN jsonb_build_object(
+    'total_groups', COALESCE(v_groups, 0),
+    'registered_accounts', COALESCE(v_accounts, 0),
+    'active_leaders', COALESCE(v_leaders, 0),
+    'total_youth_members', COALESCE(v_members, 0)
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION admin_get_platform_stats() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION admin_get_platform_stats() TO authenticated;
+
 CREATE OR REPLACE FUNCTION admin_update_tenant(
   p_group_id uuid,
   p_number integer,

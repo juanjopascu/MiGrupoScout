@@ -636,7 +636,7 @@ export function deleteLocalGroupTenant(groupId, confirmNumber) {
 
 export function adminListAllLocalTenants() {
   const session = getLocalSession();
-  if (!session?.user?.id || !isLocalPlatformAdmin(session.user.id)) {
+  if (!session?.user?.id || !isLocalPlatformAdmin(session.user.id, session.user.email)) {
     return {
       ok: false,
       error: 'Acceso restringido al Administrador Global de la plataforma.',
@@ -664,6 +664,34 @@ export function adminListAllLocalTenants() {
     });
 
   return { ok: true, tenants };
+}
+
+export function adminGetLocalPlatformStats() {
+  const session = getLocalSession();
+  if (!session?.user?.id || !isLocalPlatformAdmin(session.user.id, session.user.email)) {
+    return {
+      ok: false,
+      error: 'Acceso restringido al Administrador Global de la plataforma.',
+      stats: null
+    };
+  }
+
+  const groups = readStoreJson(LOCAL_STORE_KEYS.GROUPS, []);
+  const users = readStoreJson(LOCAL_STORE_KEYS.USERS, []);
+  const memberships = readStoreJson(LOCAL_STORE_KEYS.MEMBERSHIPS, []);
+  const activeLeaderIds = new Set(
+    memberships.filter((m) => m.is_active !== false).map((m) => m.user_id)
+  );
+
+  return {
+    ok: true,
+    stats: {
+      total_groups: groups.length,
+      registered_accounts: users.length,
+      active_leaders: activeLeaderIds.size,
+      total_youth_members: 0
+    }
+  };
 }
 
 export function adminUpdateLocalTenant(groupId, input) {

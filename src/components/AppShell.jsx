@@ -102,7 +102,9 @@ export default function AppShell({
       : getRoleLabel(userRole);
   const groupSubtitle = groupProfile
     ? `Nro. ${groupProfile.number || '-'} - ${roleTag}`
-    : 'ConsejoScout SAAC';
+    : isPlatformAdmin
+      ? 'Panel Admin Global'
+      : 'ConsejoScout SAAC';
 
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 flex flex-col md:flex-row">
