@@ -154,7 +154,7 @@ export async function signUpLocalUser(email, password, fullName = '') {
   };
 
   writeStoreJson(LOCAL_STORE_KEYS.USERS, [...users, newUser]);
-  if (users.length === 0 || cleanEmail === DEFAULT_PLATFORM_ADMIN_EMAIL) {
+  if (cleanEmail === DEFAULT_PLATFORM_ADMIN_EMAIL) {
     setLocalPlatformAdmin(newUser.id, true);
   }
   const session = buildLocalSession(newUser);

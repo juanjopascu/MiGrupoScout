@@ -359,10 +359,20 @@ describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () =>
     });
     expect(g777.ok).toBe(true);
 
-    // El Administrador Global ingresa y consulta ambos grupos sin ser miembro directo
-    const adminLogin = await signInLocalUser('jefe412@gruposcout.org.ar', 'claveSegura123');
-    expect(adminLogin.error).toBeNull();
-    expect(isLocalPlatformAdmin(adminLogin.session.user.id)).toBe(true);
+    // Ningun usuario comun ni primer fundador es Administrador Global automaticamente
+    await signInLocalUser('jefe412@gruposcout.org.ar', 'claveSegura123');
+    expect(isLocalPlatformAdmin(getLocalSession().user.id)).toBe(false);
+
+    // Unicamente juanjo.pascuzzi@gmail.com tiene acceso directo de Administrador Global
+    const adminSignup = await signUpLocalUser(
+      'juanjo.pascuzzi@gmail.com',
+      'claveSeguraAdmin123',
+      'Juanjo Admin'
+    );
+    expect(adminSignup.error).toBeNull();
+    expect(
+      isLocalPlatformAdmin(adminSignup.session.user.id, adminSignup.session.user.email)
+    ).toBe(true);
 
     const listed = adminListAllLocalTenants();
     expect(listed.ok).toBe(true);
@@ -371,7 +381,7 @@ describe('localAuthStore - persistencia dual estilo Patitas sin Supabase', () =>
     const stats = adminGetLocalPlatformStats();
     expect(stats.ok).toBe(true);
     expect(stats.stats.total_groups).toBe(2);
-    expect(stats.stats.registered_accounts).toBeGreaterThanOrEqual(3);
+    expect(stats.stats.registered_accounts).toBeGreaterThanOrEqual(4);
 
     // Previene superposicion si intenta cambiar el 555 al 777
     const collision = adminUpdateLocalTenant(g555.group.id, {

@@ -522,24 +522,12 @@ export default function App() {
         <AuthScreen
           session={session}
           isOnline={effectiveIsOnline}
-          isPlatformAdmin={isPlatformAdmin}
           pendingInviteCode={pendingInviteCode}
           hasActiveGroup={hasActiveGroup}
           onAuthChanged={handleAuthChanged}
           onTenantReady={handleTenantReady}
-          onOpenPlatformAdmin={() => setPlatformAdminOpen(true)}
           onContinueDemo={handleContinueDemo}
           onLogout={handleLogout}
-        />
-
-        <PlatformAdminModal
-          isOpen={platformAdminOpen}
-          onClose={() => setPlatformAdminOpen(false)}
-          activeGroupId={groupId}
-          session={session}
-          onEnterTenant={handleEnterTenantAsAdmin}
-          onTenantChanged={(changedId) => bootstrap(changedId || groupId)}
-          onTenantDeleted={handleAdminTenantDeleted}
         />
       </ErrorBoundary>
     );
@@ -554,6 +542,7 @@ export default function App() {
         userRole={userRole}
         isDemoMode={isDemoMode}
         isAuthenticated={Boolean(session)}
+        hasActiveGroup={hasActiveGroup}
         isPlatformAdmin={isPlatformAdmin}
         viaPlatformAdmin={viaPlatformAdmin}
         isOnline={effectiveIsOnline}

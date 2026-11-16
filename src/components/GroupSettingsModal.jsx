@@ -322,10 +322,10 @@ export default function GroupSettingsModal({
                       onClose();
                       onOpenPlatformAdmin();
                     }}
-                    className="h-11 px-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold"
+                    className="h-11 px-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-sm font-semibold"
                   >
-                    <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-                    <span>Admin Global</span>
+                    <ShieldCheck className="w-4 h-4 text-slate-700" aria-hidden="true" />
+                    <span>Panel de Grupos</span>
                   </button>
                 )}
 

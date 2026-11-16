@@ -73,6 +73,7 @@ export default function AppShell({
   userRole,
   isDemoMode,
   isAuthenticated,
+  hasActiveGroup = true,
   isPlatformAdmin = false,
   viaPlatformAdmin = false,
   isOnline,
@@ -259,15 +260,15 @@ export default function AppShell({
             <span className="hidden lg:inline truncate">Alertas Push</span>
           </button>
 
-          {isPlatformAdmin && onOpenPlatformAdmin && (
+          {isPlatformAdmin && hasActiveGroup && onOpenPlatformAdmin && (
             <button
               type="button"
               onClick={onOpenPlatformAdmin}
-              aria-label="Administracion Global de Grupos"
-              className="w-full min-h-[44px] px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center lg:justify-start gap-3 text-sm font-semibold transition-colors"
+              aria-label="Panel de Grupos"
+              className="w-full min-h-[44px] px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 flex items-center justify-center lg:justify-start gap-3 text-sm font-medium text-slate-800 transition-colors"
             >
-              <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
-              <span className="hidden lg:inline truncate">Admin Global</span>
+              <ShieldCheck className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
+              <span className="hidden lg:inline truncate">Panel de Grupos</span>
             </button>
           )}
 
@@ -384,17 +385,6 @@ export default function AppShell({
             >
               <PushBellIcon pushState={pushState} />
             </button>
-
-            {isPlatformAdmin && onOpenPlatformAdmin && (
-              <button
-                type="button"
-                onClick={onOpenPlatformAdmin}
-                aria-label="Administracion Global de Grupos"
-                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-              >
-                <ShieldCheck className="w-5 h-5" aria-hidden="true" />
-              </button>
-            )}
 
             {onOpenTeamManager && (
               <button
