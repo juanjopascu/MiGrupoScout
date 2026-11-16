@@ -193,15 +193,15 @@ describe('memberCsvParser - carga masiva hasta 300 integrantes por grupo', () =>
 
 describe('branding - logo y colores institucionales del Grupo', () => {
   it('valida colores hexadecimales y calcula contraste WCAG seguro', () => {
-    expect(isValidHexColor('#1B365D')).toBe(true);
+    expect(isValidHexColor('#4D207A')).toBe(true);
     expect(isValidHexColor('#fff')).toBe(false);
     expect(isValidHexColor('red')).toBe(false);
 
-    const darkTheme = computeBrandTheme('#1B365D', '#2E7D32');
-    expect(darkTheme.primary).toBe('#1B365D');
+    const darkTheme = computeBrandTheme('#4D207A', '#7C3AED');
+    expect(darkTheme.primary).toBe('#4D207A');
     expect(darkTheme.primaryContrast).toBe('#FFFFFF');
 
-    const lightTheme = computeBrandTheme('#FACC15', '#1B365D');
+    const lightTheme = computeBrandTheme('#FACC15', '#4D207A');
     expect(lightTheme.primaryContrast).toBe('#0F172A');
 
     const fallbackTheme = computeBrandTheme('invalido', null);

@@ -58,7 +58,7 @@ export default function CampPlanner({
           <button
             type="button"
             onClick={handleCreateNew}
-            className="h-11 px-4 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold inline-flex items-center gap-1.5"
+            className="h-11 px-4 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold inline-flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
             <span>Nueva salida</span>
@@ -91,8 +91,8 @@ export default function CampPlanner({
                 onClick={() => selectCampRecord(camp)}
                 className={`min-h-[44px] px-3.5 rounded-xl border text-xs font-semibold whitespace-nowrap shrink-0 inline-flex items-center gap-2 transition-colors ${
                   active
-                    ? 'bg-[#1B365D] border-[#1B365D] text-white'
-                    : 'bg-white border-slate-300 text-slate-800 hover:border-[#1B365D]'
+                    ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white'
+                    : 'bg-white border-slate-300 text-slate-800 hover:border-[var(--brand-primary)]'
                 }`}
               >
                 <Tent className="w-3.5 h-3.5" aria-hidden="true" />
@@ -144,7 +144,7 @@ export default function CampPlanner({
             onClick={() => setStep(item.id)}
             className={`min-h-[44px] px-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors ${
               step === item.id
-                ? 'bg-[#1B365D] text-white'
+                ? 'bg-[var(--brand-primary)] text-white'
                 : 'text-slate-700 hover:bg-slate-200'
             }`}
           >

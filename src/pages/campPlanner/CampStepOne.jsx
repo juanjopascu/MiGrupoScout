@@ -31,7 +31,7 @@ export default function CampStepOne({
             }
             className={`h-12 rounded-lg text-sm font-semibold transition-colors ${
               form.activityCategory === 'salida'
-                ? 'bg-[#1B365D] text-white'
+                ? 'bg-[var(--brand-primary)] text-white'
                 : 'text-slate-800 hover:bg-slate-200'
             }`}
           >
@@ -51,7 +51,7 @@ export default function CampStepOne({
             }
             className={`h-12 rounded-lg text-sm font-semibold transition-colors ${
               form.activityCategory === 'acampe'
-                ? 'bg-[#1B365D] text-white'
+                ? 'bg-[var(--brand-primary)] text-white'
                 : 'text-slate-800 hover:bg-slate-200'
             }`}
           >
@@ -169,8 +169,8 @@ export default function CampStepOne({
                 onClick={() => onSelectPreset(preset.id)}
                 className={`min-h-[44px] px-3.5 rounded-xl border text-sm font-semibold inline-flex items-center gap-2 transition-colors ${
                   active
-                    ? 'bg-[#EBF2FA] border-[#1B365D] text-[#1B365D]'
-                    : 'bg-white border-slate-300 text-slate-800 hover:border-[#1B365D]'
+                    ? 'bg-[var(--brand-primary-soft)] border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    : 'bg-white border-slate-300 text-slate-800 hover:border-[var(--brand-primary)]'
                 }`}
               >
                 <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -183,8 +183,8 @@ export default function CampStepOne({
             onClick={() => onSelectPreset('custom')}
             className={`min-h-[44px] px-3.5 rounded-xl border text-sm font-semibold inline-flex items-center gap-2 transition-colors ${
               form.presetId === 'custom'
-                ? 'bg-[#EBF2FA] border-[#1B365D] text-[#1B365D]'
-                : 'bg-white border-slate-300 text-slate-800 hover:border-[#1B365D]'
+                ? 'bg-[var(--brand-primary-soft)] border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                : 'bg-white border-slate-300 text-slate-800 hover:border-[var(--brand-primary)]'
             }`}
           >
             <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -225,7 +225,7 @@ export default function CampStepOne({
         <button
           type="button"
           onClick={onNext}
-          className="h-12 px-6 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white font-semibold"
+          className="h-12 px-6 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold"
         >
           Continuar a Participantes
         </button>

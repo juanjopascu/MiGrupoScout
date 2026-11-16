@@ -242,7 +242,7 @@ export default function TeamManagementModal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <Users className="w-5 h-5 text-[#1B365D] shrink-0" aria-hidden="true" />
+            <Users className="w-5 h-5 text-[var(--brand-primary)] shrink-0" aria-hidden="true" />
             <div className="min-w-0">
               <h2 id="team-modal-title" className="text-lg font-semibold text-slate-900 truncate">
                 Equipo de Dirigentes e Invitaciones
@@ -278,7 +278,7 @@ export default function TeamManagementModal({
                   type="button"
                   onClick={() => setActiveTab('team')}
                   className={`min-h-[42px] px-3 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2 ${
-                    activeTab === 'team' ? 'bg-[#1B365D] text-white' : 'text-slate-700'
+                    activeTab === 'team' ? 'bg-[var(--brand-primary)] text-white' : 'text-slate-700'
                   }`}
                 >
                   <Shield className="w-4 h-4" aria-hidden="true" />
@@ -289,7 +289,7 @@ export default function TeamManagementModal({
                   disabled={!canInvite}
                   onClick={() => setActiveTab('invites')}
                   className={`min-h-[42px] px-3 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40 ${
-                    activeTab === 'invites' ? 'bg-[#1B365D] text-white' : 'text-slate-700'
+                    activeTab === 'invites' ? 'bg-[var(--brand-primary)] text-white' : 'text-slate-700'
                   }`}
                 >
                   <KeyRound className="w-4 h-4" aria-hidden="true" />
@@ -319,7 +319,7 @@ export default function TeamManagementModal({
 
               {loading ? (
                 <div className="py-8 flex items-center justify-center gap-2 text-slate-600 text-sm">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#1B365D]" aria-hidden="true" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[var(--brand-primary)]" aria-hidden="true" />
                   <span>Cargando equipo del Grupo...</span>
                 </div>
               ) : activeTab === 'team' ? (
@@ -427,7 +427,7 @@ export default function TeamManagementModal({
                     className="p-4 rounded-xl border border-slate-300 bg-slate-50 space-y-3"
                   >
                     <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                      <UserPlus className="w-4 h-4 text-[#1B365D]" aria-hidden="true" />
+                      <UserPlus className="w-4 h-4 text-[var(--brand-primary)]" aria-hidden="true" />
                       <span>Generar invitacion para el equipo</span>
                     </h3>
 
@@ -548,7 +548,7 @@ export default function TeamManagementModal({
                     <button
                       type="submit"
                       disabled={creatingInvite}
-                      className="w-full h-11 bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                      className="w-full h-11 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
                     >
                       {creatingInvite ? 'Generando codigo...' : 'Crear invitacion'}
                     </button>
@@ -621,7 +621,7 @@ export default function TeamManagementModal({
                                   <button
                                     type="button"
                                     onClick={() => copyText(`msg-${inv.id}`, shareMsg)}
-                                    className="h-9 px-3 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] font-semibold inline-flex items-center gap-1.5"
+                                    className="h-9 px-3 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] font-semibold inline-flex items-center gap-1.5"
                                   >
                                     {copiedId === `msg-${inv.id}` ? (
                                       <Check className="w-3.5 h-3.5 text-green-700" aria-hidden="true" />

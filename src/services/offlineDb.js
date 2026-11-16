@@ -63,8 +63,8 @@ export function buildDemoSeedData(groupId = DEMO_GROUP_ID) {
     district: 'Distrito 2',
     zone: 'Zona 14',
     org_model: 'tradicional',
-    primary_color: '#1B365D',
-    accent_color: '#2E7D32',
+    primary_color: '#4D207A',
+    accent_color: '#7C3AED',
     logo_url: null,
     userRole: 'jefe_grupo',
     isDemo: true,
@@ -452,8 +452,8 @@ export async function getGroupProfile(groupId = DEMO_GROUP_ID) {
     district: 'Distrito 2',
     zone: 'Zona 14',
     org_model: 'tradicional',
-    primary_color: '#1B365D',
-    accent_color: '#2E7D32',
+    primary_color: '#4D207A',
+    accent_color: '#7C3AED',
     logo_url: null,
     isDemo: groupId === DEMO_GROUP_ID
   };

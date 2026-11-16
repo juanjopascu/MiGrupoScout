@@ -112,7 +112,7 @@ export default function DocGenerator({
           <button
             type="button"
             onClick={() => applyCampData(nextCamp)}
-            className="h-11 px-4 rounded-lg border border-[#1B365D] bg-[#EBF2FA] text-[#1B365D] hover:bg-blue-100 text-sm font-semibold inline-flex items-center justify-center gap-2 shrink-0"
+            className="h-11 px-4 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] hover:bg-blue-100 text-sm font-semibold inline-flex items-center justify-center gap-2 shrink-0"
           >
             <Download className="w-4 h-4" aria-hidden="true" />
             <span>Cargar datos de proxima salida</span>
@@ -138,8 +138,8 @@ export default function DocGenerator({
               onClick={() => setDocType(item.id)}
               className={`min-h-[68px] p-3 rounded-xl text-left flex items-center gap-2.5 transition-colors ${
                 selected
-                  ? 'border-2 border-[#1B365D] bg-[#EBF2FA] text-[#1B365D]'
-                  : 'border border-slate-300 bg-white text-slate-800 hover:border-[#1B365D]'
+                  ? 'border-2 border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]'
+                  : 'border border-slate-300 bg-white text-slate-800 hover:border-[var(--brand-primary)]'
               }`}
             >
               <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
@@ -155,7 +155,7 @@ export default function DocGenerator({
           type="button"
           onClick={() => setMobileTab('form')}
           className={`h-11 rounded-lg text-sm font-semibold transition-colors ${
-            mobileTab === 'form' ? 'bg-[#1B365D] text-white' : 'text-slate-700'
+            mobileTab === 'form' ? 'bg-[var(--brand-primary)] text-white' : 'text-slate-700'
           }`}
         >
           1. Completar datos
@@ -164,7 +164,7 @@ export default function DocGenerator({
           type="button"
           onClick={() => setMobileTab('preview')}
           className={`h-11 rounded-lg text-sm font-semibold transition-colors ${
-            mobileTab === 'preview' ? 'bg-[#1B365D] text-white' : 'text-slate-700'
+            mobileTab === 'preview' ? 'bg-[var(--brand-primary)] text-white' : 'text-slate-700'
           }`}
         >
           2. Vista previa y Copiar
@@ -201,7 +201,7 @@ export default function DocGenerator({
               className={`h-12 flex-1 px-4 rounded-lg font-semibold inline-flex items-center justify-center gap-2 transition-colors ${
                 copied
                   ? 'bg-green-700 text-white'
-                  : 'bg-[#1B365D] hover:bg-[#122643] text-white'
+                  : 'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white'
               }`}
             >
               {copied ? (

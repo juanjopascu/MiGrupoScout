@@ -129,7 +129,7 @@ export default function NormativaChat({
         <div className="flex items-center gap-2 min-w-0">
           {remoteAvailable && isOnline ? (
             <>
-              <Cloud className="w-4 h-4 text-[#1B365D] shrink-0" aria-hidden="true" />
+              <Cloud className="w-4 h-4 text-[var(--brand-primary)] shrink-0" aria-hidden="true" />
               <Database className="w-4 h-4 text-green-700 shrink-0" aria-hidden="true" />
               <span className="text-xs sm:text-sm font-medium text-slate-800 truncate">
                 Conectado a saac_knowledge_base + Base local offline
@@ -137,7 +137,7 @@ export default function NormativaChat({
             </>
           ) : (
             <>
-              <HardDrive className="w-4 h-4 text-[#1B365D] shrink-0" aria-hidden="true" />
+              <HardDrive className="w-4 h-4 text-[var(--brand-primary)] shrink-0" aria-hidden="true" />
               <span className="text-xs sm:text-sm font-medium text-slate-800 truncate">
                 Modo Offline: respondiendo desde base normativa local precargada
               </span>
@@ -151,7 +151,7 @@ export default function NormativaChat({
               type="button"
               onClick={() => setShowSuggestionsBar((prev) => !prev)}
               aria-label="Mostrar sugerencias frecuentes"
-              className="min-w-[44px] min-h-[44px] px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-[#1B365D] hover:bg-slate-200"
+              className="min-w-[44px] min-h-[44px] px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-[var(--brand-primary)] hover:bg-slate-200"
             >
               <HelpCircle className="w-4 h-4" aria-hidden="true" />
               <span className="hidden sm:inline">Sugerencias</span>
@@ -177,7 +177,7 @@ export default function NormativaChat({
               key={item.id}
               type="button"
               onClick={() => void submitQuestion(item.question)}
-              className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-300 bg-slate-50 hover:border-[#1B365D] text-xs font-medium text-slate-800 whitespace-nowrap shrink-0"
+              className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-300 bg-slate-50 hover:border-[var(--brand-primary)] text-xs font-medium text-slate-800 whitespace-nowrap shrink-0"
             >
               {item.question}
             </button>
@@ -206,9 +206,9 @@ export default function NormativaChat({
                     key={faq.id}
                     type="button"
                     onClick={() => void submitQuestion(faq.question)}
-                    className="w-full min-h-[48px] px-4 py-3 text-left rounded-xl border border-slate-300 bg-white hover:border-[#1B365D] hover:bg-[#EBF2FA]/50 flex items-center gap-3 transition-colors"
+                    className="w-full min-h-[48px] px-4 py-3 text-left rounded-xl border border-slate-300 bg-white hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] flex items-center gap-3 transition-colors"
                   >
-                    <span className="w-9 h-9 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                    <span className="w-9 h-9 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                       <Icon className="w-4 h-4" aria-hidden="true" />
                     </span>
                     <span className="text-sm font-medium text-slate-900">
@@ -225,7 +225,7 @@ export default function NormativaChat({
           if (msg.role === 'user') {
             return (
               <div key={msg.id} className="flex justify-end">
-                <div className="max-w-[85%] bg-[#1B365D] text-white rounded-2xl rounded-br-sm px-4 py-3 text-base leading-6">
+                <div className="max-w-[85%] bg-[var(--brand-primary)] text-white rounded-2xl rounded-br-sm px-4 py-3 text-base leading-6">
                   {msg.text}
                 </div>
               </div>
@@ -267,9 +267,9 @@ export default function NormativaChat({
 
                 {/* Tarjeta Obligatoria de Cita Normativa */}
                 {doc && (
-                  <div className="bg-slate-100 border-l-4 border-[#1B365D] rounded-r-lg p-3 mt-3 space-y-2">
+                  <div className="bg-slate-100 border-l-4 border-[var(--brand-primary)] rounded-r-lg p-3 mt-3 space-y-2">
                     <div className="flex items-start gap-2">
-                      <FileText className="w-4 h-4 text-[#1B365D] shrink-0 mt-0.5" aria-hidden="true" />
+                      <FileText className="w-4 h-4 text-[var(--brand-primary)] shrink-0 mt-0.5" aria-hidden="true" />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900">
                           {doc.docTitle}
@@ -291,7 +291,7 @@ export default function NormativaChat({
                         className={`min-h-[44px] px-3 rounded-lg border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                           isCopied
                             ? 'bg-green-700 border-green-700 text-white'
-                            : 'bg-white border-slate-300 text-slate-800 hover:border-[#1B365D]'
+                            : 'bg-white border-slate-300 text-slate-800 hover:border-[var(--brand-primary)]'
                         }`}
                       >
                         {isCopied ? (
@@ -311,7 +311,7 @@ export default function NormativaChat({
                         <button
                           type="button"
                           onClick={onNavigateToCampPlanner}
-                          className="min-h-[44px] px-3 rounded-lg border border-[#1B365D] bg-[#EBF2FA] text-[#1B365D] text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-blue-100"
+                          className="min-h-[44px] px-3 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-blue-100"
                         >
                           <Tent className="w-3.5 h-3.5" aria-hidden="true" />
                           <span>Validar en Planificador</span>
@@ -322,7 +322,7 @@ export default function NormativaChat({
                         <button
                           type="button"
                           onClick={onNavigateToDocGenerator}
-                          className="min-h-[44px] px-3 rounded-lg border border-[#1B365D] bg-[#EBF2FA] text-[#1B365D] text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-blue-100"
+                          className="min-h-[44px] px-3 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-blue-100"
                         >
                           <FileText className="w-3.5 h-3.5" aria-hidden="true" />
                           <span>Redactar Nota</span>
@@ -339,7 +339,7 @@ export default function NormativaChat({
         {isSearching && (
           <div className="flex justify-start">
             <div className="bg-white border border-slate-300 rounded-2xl rounded-bl-sm px-4 py-3 inline-flex items-center gap-2.5 text-sm text-slate-700">
-              <Loader2 className="w-4 h-4 animate-spin text-[#1B365D]" aria-hidden="true" />
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-primary)]" aria-hidden="true" />
               <span>Consultando normativa SAAC...</span>
             </div>
           </div>
@@ -371,7 +371,7 @@ export default function NormativaChat({
             type="submit"
             disabled={!inputText.trim() || isSearching}
             aria-label="Enviar consulta"
-            className="w-12 h-12 shrink-0 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white inline-flex items-center justify-center transition-colors disabled:opacity-50"
+            className="w-12 h-12 shrink-0 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white inline-flex items-center justify-center transition-colors disabled:opacity-50"
           >
             <Send className="w-5 h-5" aria-hidden="true" />
           </button>

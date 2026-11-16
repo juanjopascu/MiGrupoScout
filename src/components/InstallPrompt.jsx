@@ -84,11 +84,11 @@ export default function InstallPrompt() {
     <>
       <aside
         aria-label="Instalacion de aplicacion"
-        className="fixed z-30 bottom-above-nav left-4 right-4 md:left-auto md:right-6 md:bottom-6 md:w-full md:max-w-md bg-white border border-[#1B365D] shadow-lg rounded-xl p-4"
+        className="fixed z-30 bottom-above-nav left-4 right-4 md:left-auto md:right-6 md:bottom-6 md:w-full md:max-w-md bg-white border border-[var(--brand-primary)] shadow-lg rounded-xl p-4"
       >
         {deferredPrompt ? (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
               <Download className="w-5 h-5" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export default function InstallPrompt() {
               <button
                 type="button"
                 onClick={handleInstallAndroid}
-                className="h-11 px-4 bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold rounded-lg transition-colors"
+                className="h-11 px-4 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-sm font-semibold rounded-lg transition-colors"
               >
                 Instalar
               </button>
@@ -119,7 +119,7 @@ export default function InstallPrompt() {
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
               <Smartphone className="w-5 h-5" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
@@ -134,7 +134,7 @@ export default function InstallPrompt() {
               <button
                 type="button"
                 onClick={() => setShowIosModal(true)}
-                className="h-11 px-3 inline-flex items-center gap-1.5 border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold rounded-lg transition-colors"
+                className="h-11 px-3 inline-flex items-center gap-1.5 border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold rounded-lg transition-colors"
               >
                 <Info className="w-4 h-4" aria-hidden="true" />
                 <span>Ver pasos</span>
@@ -184,7 +184,7 @@ export default function InstallPrompt() {
 
             <ol className="space-y-3">
               <li className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-slate-50">
-                <span className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                <span className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                   <Share className="w-5 h-5" aria-hidden="true" />
                 </span>
                 <span className="text-sm text-slate-800">
@@ -192,7 +192,7 @@ export default function InstallPrompt() {
                 </span>
               </li>
               <li className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-slate-50">
-                <span className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                <span className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                   <PlusSquare className="w-5 h-5" aria-hidden="true" />
                 </span>
                 <span className="text-sm text-slate-800">
@@ -200,7 +200,7 @@ export default function InstallPrompt() {
                 </span>
               </li>
               <li className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-slate-50">
-                <span className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                <span className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                   <BellRing className="w-5 h-5" aria-hidden="true" />
                 </span>
                 <span className="text-sm text-slate-800">
@@ -212,7 +212,7 @@ export default function InstallPrompt() {
             <button
               type="button"
               onClick={() => setShowIosModal(false)}
-              className="w-full h-12 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors"
+              className="w-full h-12 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors"
             >
               Entendido
             </button>

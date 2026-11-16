@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS scout_groups (
   zone text NOT NULL,
   org_model text NOT NULL DEFAULT 'tradicional'
     CHECK (org_model IN ('tradicional', 'nucleo', 'comunitario', 'escolar')),
-  primary_color text NOT NULL DEFAULT '#1B365D'
+  primary_color text NOT NULL DEFAULT '#4D207A'
     CHECK (primary_color ~ '^#[0-9A-Fa-f]{6}$'),
-  accent_color text NOT NULL DEFAULT '#2E7D32'
+  accent_color text NOT NULL DEFAULT '#7C3AED'
     CHECK (accent_color ~ '^#[0-9A-Fa-f]{6}$'),
   logo_url text
     CHECK (

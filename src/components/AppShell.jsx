@@ -126,8 +126,8 @@ export default function AppShell({
                 style={
                   isActive
                     ? {
-                        backgroundColor: 'var(--brand-primary-soft, #EBF2FA)',
-                        color: 'var(--brand-primary-soft-text, #1B365D)'
+                        backgroundColor: 'var(--brand-primary-soft, #F3ECF9)',
+                        color: 'var(--brand-primary-soft-text, #4D207A)'
                       }
                     : undefined
                 }
@@ -168,7 +168,7 @@ export default function AppShell({
               type="button"
               onClick={onOpenAuthScreen}
               aria-label="Iniciar sesion con correo y contrasena"
-              className="w-full min-h-[44px] px-3 rounded-lg bg-[#1B365D] hover:bg-[#122643] flex items-center justify-center lg:justify-start gap-3 text-sm font-semibold text-white"
+              className="w-full min-h-[44px] px-3 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] flex items-center justify-center lg:justify-start gap-3 text-sm font-semibold text-white"
             >
               <LogIn className="w-5 h-5 shrink-0" aria-hidden="true" />
               <span className="hidden lg:inline truncate">Iniciar sesion</span>
@@ -253,7 +253,7 @@ export default function AppShell({
                 type="button"
                 onClick={onOpenAuthScreen}
                 aria-label="Iniciar sesion"
-                className="h-9 px-2.5 inline-flex items-center justify-center gap-1 rounded-lg bg-[#1B365D] text-white text-xs font-semibold"
+                className="h-9 px-2.5 inline-flex items-center justify-center gap-1 rounded-lg bg-[var(--brand-primary)] text-white text-xs font-semibold"
               >
                 <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Ingresar</span>
@@ -297,7 +297,7 @@ export default function AppShell({
         <div
           role="status"
           aria-live="polite"
-          className="md:ml-20 lg:ml-64 bg-[#1B365D] text-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-20"
+          className="md:ml-20 lg:ml-64 bg-[var(--brand-primary)] text-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-20"
         >
           <div className="flex items-center gap-2 text-sm font-medium">
             <RefreshCw className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -307,7 +307,7 @@ export default function AppShell({
             <button
               type="button"
               onClick={onAcceptSwUpdate}
-              className="h-10 px-4 rounded-lg bg-white text-[#1B365D] text-sm font-semibold hover:bg-slate-100"
+              className="h-10 px-4 rounded-lg bg-white text-[var(--brand-primary)] text-sm font-semibold hover:bg-slate-100"
             >
               Actualizar ahora
             </button>
@@ -361,8 +361,8 @@ export default function AppShell({
                   style={
                     isActive
                       ? {
-                          backgroundColor: 'var(--brand-primary-soft, #EBF2FA)',
-                          color: 'var(--brand-primary-soft-text, #1B365D)'
+                          backgroundColor: 'var(--brand-primary-soft, #F3ECF9)',
+                          color: 'var(--brand-primary-soft-text, #4D207A)'
                         }
                       : undefined
                   }
@@ -375,7 +375,7 @@ export default function AppShell({
                 <span
                   style={
                     isActive
-                      ? { color: 'var(--brand-primary-soft-text, #1B365D)' }
+                      ? { color: 'var(--brand-primary-soft-text, #4D207A)' }
                       : undefined
                   }
                   className={`text-[12px] leading-4 ${

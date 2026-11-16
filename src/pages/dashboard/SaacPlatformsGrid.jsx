@@ -19,10 +19,10 @@ export default function SaacPlatformsGrid() {
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative min-h-[76px] p-3 rounded-xl bg-white border border-slate-300 hover:border-[#1B365D] shadow-sm flex flex-col justify-between gap-2 transition-colors"
+              className="relative min-h-[76px] p-3 rounded-xl bg-white border border-slate-300 hover:border-[var(--brand-primary)] shadow-sm flex flex-col justify-between gap-2 transition-colors"
             >
               <div className="flex items-center justify-between">
-                <span className="w-8 h-8 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center">
+                <span className="w-8 h-8 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center">
                   <Icon className="w-4 h-4" aria-hidden="true" />
                 </span>
                 <ExternalLink className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />

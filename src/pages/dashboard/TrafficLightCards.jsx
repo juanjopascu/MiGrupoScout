@@ -70,7 +70,7 @@ export default function TrafficLightCards({
           <button
             type="button"
             onClick={onFilterCruzPending}
-            className="min-h-[44px] px-3 rounded-lg border border-slate-300 hover:border-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold text-[#1B365D] inline-flex items-center justify-between transition-colors"
+            className="min-h-[44px] px-3 rounded-lg border border-slate-300 hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold text-[var(--brand-primary)] inline-flex items-center justify-between transition-colors"
           >
             <span>Ver pendientes</span>
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -84,7 +84,7 @@ export default function TrafficLightCards({
               <h2 className="text-base font-semibold text-slate-900">
                 Fichas Medicas
               </h2>
-              <HeartPulse className="w-5 h-5 text-[#1B365D] shrink-0" aria-hidden="true" />
+              <HeartPulse className="w-5 h-5 text-[var(--brand-primary)] shrink-0" aria-hidden="true" />
             </div>
 
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -119,7 +119,7 @@ export default function TrafficLightCards({
           <button
             type="button"
             onClick={onFilterMedicalAlert}
-            className="min-h-[44px] px-3 rounded-lg border border-slate-300 hover:border-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold text-[#1B365D] inline-flex items-center justify-between transition-colors"
+            className="min-h-[44px] px-3 rounded-lg border border-slate-300 hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold text-[var(--brand-primary)] inline-flex items-center justify-between transition-colors"
           >
             <span>Revisar fichas</span>
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -133,7 +133,7 @@ export default function TrafficLightCards({
               <h2 className="text-base font-semibold text-slate-900">
                 Proximos Campamentos
               </h2>
-              <Tent className="w-5 h-5 text-[#1B365D] shrink-0" aria-hidden="true" />
+              <Tent className="w-5 h-5 text-[var(--brand-primary)] shrink-0" aria-hidden="true" />
             </div>
 
             {nextCamp ? (
@@ -162,7 +162,7 @@ export default function TrafficLightCards({
           <button
             type="button"
             onClick={() => onOpenCampPlanner(nextCamp?.id || null)}
-            className="h-11 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+            className="h-11 px-4 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
           >
             <Tent className="w-4 h-4" aria-hidden="true" />
             <span>Abrir planificador</span>

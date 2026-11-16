@@ -221,7 +221,7 @@ export default function AuthTenantPanel({
                 setAuthMessage(null);
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold ${
-                authTab === 'login' ? 'bg-[#1B365D] text-white' : 'text-slate-700'
+                authTab === 'login' ? 'bg-[var(--brand-primary)] text-white' : 'text-slate-700'
               }`}
             >
               Ingresar
@@ -233,7 +233,7 @@ export default function AuthTenantPanel({
                 setAuthMessage(null);
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold ${
-                authTab === 'signup' ? 'bg-[#1B365D] text-white' : 'text-slate-700'
+                authTab === 'signup' ? 'bg-[var(--brand-primary)] text-white' : 'text-slate-700'
               }`}
             >
               Crear cuenta
@@ -242,11 +242,10 @@ export default function AuthTenantPanel({
         </div>
 
         {!isSupabaseConfigured && (
-          <div className="p-3 rounded-xl border border-amber-700 bg-amber-100 text-amber-900 text-xs space-y-1">
-            <p className="font-semibold">Backend Supabase pendiente de configuracion</p>
-            <p>
-              Para autenticar usuarios reales agrega <code>VITE_SUPABASE_URL</code> y{' '}
-              <code>VITE_SUPABASE_ANON_KEY</code> en Vercel. Mientras tanto podes probar la app en Modo Demo Local.
+          <div className="p-3 rounded-xl border border-slate-300 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] text-xs space-y-1">
+            <p className="font-semibold">Modo nube en espera de vinculacion</p>
+            <p className="text-slate-700">
+              Para usar cuentas reales por Grupo Scout se requiere conectar Supabase en este dominio. Podes ingresar ahora al Modo Demo Local desde el boton inferior.
             </p>
           </div>
         )}
@@ -317,7 +316,7 @@ export default function AuthTenantPanel({
                 <button
                   type="button"
                   onClick={handleResetPassword}
-                  className="text-xs font-semibold text-[#1B365D] hover:underline"
+                  className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
                 >
                   Olvide mi contrasena
                 </button>
@@ -371,7 +370,7 @@ export default function AuthTenantPanel({
           <button
             type="submit"
             disabled={authLoading}
-            className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {authTab === 'signup' ? (
               <UserPlus className="w-4 h-4" aria-hidden="true" />
@@ -412,7 +411,7 @@ export default function AuthTenantPanel({
           onClick={() => setOnboardingMode('create_tenant')}
           className={`min-h-[42px] px-3 rounded-lg text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 ${
             onboardingMode === 'create_tenant'
-              ? 'bg-[#1B365D] text-white'
+              ? 'bg-[var(--brand-primary)] text-white'
               : 'text-slate-700 hover:bg-slate-200'
           }`}
         >
@@ -424,7 +423,7 @@ export default function AuthTenantPanel({
           onClick={() => setOnboardingMode('join_invite')}
           className={`min-h-[42px] px-3 rounded-lg text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 ${
             onboardingMode === 'join_invite'
-              ? 'bg-[#1B365D] text-white'
+              ? 'bg-[var(--brand-primary)] text-white'
               : 'text-slate-700 hover:bg-slate-200'
           }`}
         >
@@ -436,7 +435,7 @@ export default function AuthTenantPanel({
       {onboardingMode === 'create_tenant' ? (
         <form onSubmit={handleCreateTenant} className="space-y-3 bg-slate-50 border border-slate-300 rounded-xl p-4">
           <p className="text-xs text-slate-700 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-[#1B365D] shrink-0" aria-hidden="true" />
+            <ShieldCheck className="w-4 h-4 text-[var(--brand-primary)] shrink-0" aria-hidden="true" />
             <span>Quedaras asignado como <strong>Jefe de Grupo</strong> para configurar datos e invitar a tu equipo.</span>
           </p>
 
@@ -542,7 +541,7 @@ export default function AuthTenantPanel({
           <button
             type="submit"
             disabled={tenantSubmitting}
-            className="w-full h-11 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="w-full h-11 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {tenantSubmitting ? 'Creando Grupo...' : 'Crear Grupo y comenzar como Jefe de Grupo'}
           </button>
@@ -569,7 +568,7 @@ export default function AuthTenantPanel({
                 type="button"
                 onClick={() => handlePreviewInvite()}
                 disabled={inviteLoading || !inviteCode}
-                className="w-full sm:w-auto h-11 px-4 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold disabled:opacity-50"
+                className="w-full sm:w-auto h-11 px-4 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold disabled:opacity-50"
               >
                 Verificar
               </button>
@@ -597,7 +596,7 @@ export default function AuthTenantPanel({
           <button
             type="submit"
             disabled={inviteLoading || !inviteCode}
-            className="w-full h-11 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="w-full h-11 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {inviteLoading ? 'Vinculando...' : 'Aceptar invitacion y entrar al Grupo'}
           </button>

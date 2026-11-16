@@ -1,5 +1,6 @@
-import { Compass, Shield } from 'lucide-react';
+import { Compass } from 'lucide-react';
 import AuthTenantPanel from './AuthTenantPanel.jsx';
+import FleurDeLisIcon from './FleurDeLisIcon.jsx';
 
 export default function AuthScreen({
   session,
@@ -14,8 +15,8 @@ export default function AuthScreen({
     <div className="min-h-dvh bg-slate-100 flex flex-col justify-center py-8 px-4">
       <div className="w-full max-w-md mx-auto space-y-5">
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-[#1B365D] text-white inline-flex items-center justify-center shadow-sm">
-            <Shield className="w-7 h-7" aria-hidden="true" />
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-[var(--brand-primary)] text-white inline-flex items-center justify-center shadow-sm">
+            <FleurDeLisIcon className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             ConsejoScout
@@ -41,7 +42,7 @@ export default function AuthScreen({
                 onClick={onContinueDemo}
                 className="w-full h-11 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
               >
-                <Compass className="w-4 h-4 text-[#1B365D]" aria-hidden="true" />
+                <Compass className="w-4 h-4 text-[var(--brand-primary)]" aria-hidden="true" />
                 <span>Explorar en Modo Demo Local (sin cuenta)</span>
               </button>
             ) : (

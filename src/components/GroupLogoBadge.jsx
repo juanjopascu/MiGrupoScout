@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Shield } from 'lucide-react';
 import { isSafeLogoValue } from '../domain/branding.js';
+import FleurDeLisIcon from './FleurDeLisIcon.jsx';
 
 export default function GroupLogoBadge({
   logoUrl,
@@ -35,11 +35,11 @@ export default function GroupLogoBadge({
     <div
       className={`${sizeClass} rounded-xl inline-flex items-center justify-center shrink-0 transition-colors`}
       style={{
-        backgroundColor: primaryColor || 'var(--brand-primary, #1B365D)',
+        backgroundColor: primaryColor || 'var(--brand-primary, #4D207A)',
         color: 'var(--brand-primary-contrast, #FFFFFF)'
       }}
     >
-      <Shield className={iconClass} aria-hidden="true" />
+      <FleurDeLisIcon className={iconClass} />
     </div>
   );
 }

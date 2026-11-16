@@ -44,7 +44,7 @@ export default class ErrorBoundary extends React.Component {
             <button
               type="button"
               onClick={this.handleReload}
-              className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors"
+              className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors"
             >
               <RotateCcw className="w-4 h-4" aria-hidden="true" />
               <span>Recargar ConsejoScout</span>

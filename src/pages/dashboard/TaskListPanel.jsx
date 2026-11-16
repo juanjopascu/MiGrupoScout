@@ -43,7 +43,7 @@ export default function TaskListPanel({
                       ? `Marcar como pendiente: ${cleanUserText(task.title)}`
                       : `Marcar como completada: ${cleanUserText(task.title)}`
                   }
-                  className="min-w-[44px] min-h-[44px] -ml-1 inline-flex items-center justify-center rounded-lg text-[#1B365D] hover:bg-slate-100 shrink-0"
+                  className="min-w-[44px] min-h-[44px] -ml-1 inline-flex items-center justify-center rounded-lg text-[var(--brand-primary)] hover:bg-slate-100 shrink-0"
                 >
                   {isDone ? (
                     <CheckSquare className="w-5 h-5 text-green-700" aria-hidden="true" />

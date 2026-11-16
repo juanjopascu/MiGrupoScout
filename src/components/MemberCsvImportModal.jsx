@@ -68,7 +68,7 @@ export default function MemberCsvImportModal({ isOpen, onClose, onImportBatch })
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <FileSpreadsheet className="w-5 h-5 text-[#1B365D]" aria-hidden="true" />
+            <FileSpreadsheet className="w-5 h-5 text-[var(--brand-primary)]" aria-hidden="true" />
             <h2 id="csv-import-title" className="text-lg font-semibold text-slate-900">
               Importacion masiva de nomina (CSV)
             </h2>
@@ -91,7 +91,7 @@ export default function MemberCsvImportModal({ isOpen, onClose, onImportBatch })
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="h-10 px-3.5 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-xs font-semibold inline-flex items-center gap-2 cursor-pointer">
+          <label className="h-10 px-3.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-xs font-semibold inline-flex items-center gap-2 cursor-pointer">
             <Upload className="w-4 h-4" aria-hidden="true" />
             <span>Elegir archivo .csv</span>
             <input
@@ -166,7 +166,7 @@ export default function MemberCsvImportModal({ isOpen, onClose, onImportBatch })
           type="button"
           disabled={importing || parsed.validRecords.length === 0}
           onClick={handleImport}
-          className="w-full h-11 bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+          className="w-full h-11 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
         >
           {importing
             ? 'Importando...'

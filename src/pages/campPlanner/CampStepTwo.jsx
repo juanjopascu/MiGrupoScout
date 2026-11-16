@@ -107,7 +107,7 @@ export default function CampStepTwo({ form, setForm, onPrev, onNext }) {
         <button
           type="button"
           onClick={onNext}
-          className="h-12 px-6 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white font-semibold"
+          className="h-12 px-6 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold"
         >
           Continuar a Carpeta
         </button>

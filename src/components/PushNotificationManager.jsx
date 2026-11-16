@@ -155,7 +155,7 @@ export default function PushNotificationManager({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
-            <BellRing className="w-5 h-5 text-[#1B365D]" aria-hidden="true" />
+            <BellRing className="w-5 h-5 text-[var(--brand-primary)]" aria-hidden="true" />
             <h2 id="push-manager-title" className="text-lg font-semibold text-slate-900">
               Centro de Alertas Push
             </h2>
@@ -173,7 +173,7 @@ export default function PushNotificationManager({
         <div className="p-5 space-y-4">
           {localState === 'checking' && (
             <div className="flex items-center justify-center gap-3 py-8 text-slate-700">
-              <Loader2 className="w-5 h-5 animate-spin text-[#1B365D]" aria-hidden="true" />
+              <Loader2 className="w-5 h-5 animate-spin text-[var(--brand-primary)]" aria-hidden="true" />
               <span className="text-sm font-medium">
                 Verificando compatibilidad de alertas...
               </span>
@@ -196,7 +196,7 @@ export default function PushNotificationManager({
 
               <ol className="space-y-3">
                 <li className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
-                  <span className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                  <span className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                     <Share className="w-5 h-5" aria-hidden="true" />
                   </span>
                   <span className="text-sm text-slate-800">
@@ -204,7 +204,7 @@ export default function PushNotificationManager({
                   </span>
                 </li>
                 <li className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
-                  <span className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                  <span className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                     <PlusSquare className="w-5 h-5" aria-hidden="true" />
                   </span>
                   <span className="text-sm text-slate-800">
@@ -212,7 +212,7 @@ export default function PushNotificationManager({
                   </span>
                 </li>
                 <li className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
-                  <span className="w-10 h-10 rounded-lg bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center shrink-0">
+                  <span className="w-10 h-10 rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center shrink-0">
                     <BellRing className="w-5 h-5" aria-hidden="true" />
                   </span>
                   <span className="text-sm text-slate-800">
@@ -235,7 +235,7 @@ export default function PushNotificationManager({
           {localState === 'default' && (
             <div className="space-y-4">
               <div className="flex flex-col items-center text-center space-y-3 pt-1">
-                <div className="w-14 h-14 rounded-2xl bg-[#EBF2FA] text-[#1B365D] inline-flex items-center justify-center">
+                <div className="w-14 h-14 rounded-2xl bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] inline-flex items-center justify-center">
                   <BellRing className="w-7 h-7" aria-hidden="true" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900">
@@ -261,7 +261,7 @@ export default function PushNotificationManager({
               <button
                 type="button"
                 onClick={handleSubscribe}
-                className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors"
+                className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors"
               >
                 <Bell className="w-5 h-5" aria-hidden="true" />
                 <span>Activar alertas del Grupo</span>
@@ -274,7 +274,7 @@ export default function PushNotificationManager({
               <button
                 type="button"
                 disabled
-                className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[#1B365D]/80 text-white font-semibold rounded-lg cursor-not-allowed"
+                className="w-full h-12 inline-flex items-center justify-center gap-2 bg-[var(--brand-primary)] opacity-80 text-white font-semibold rounded-lg cursor-not-allowed"
               >
                 <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
                 <span>Configurando suscripcion segura...</span>
@@ -304,7 +304,7 @@ export default function PushNotificationManager({
                     type="checkbox"
                     checked={prefs.campDeadlines}
                     onChange={() => handleTogglePref('campDeadlines')}
-                    className="w-5 h-5 accent-[#1B365D]"
+                    className="w-5 h-5 accent-[var(--brand-primary)]"
                   />
                 </label>
 
@@ -316,7 +316,7 @@ export default function PushNotificationManager({
                     type="checkbox"
                     checked={prefs.medicalAndMembers}
                     onChange={() => handleTogglePref('medicalAndMembers')}
-                    className="w-5 h-5 accent-[#1B365D]"
+                    className="w-5 h-5 accent-[var(--brand-primary)]"
                   />
                 </label>
 
@@ -328,7 +328,7 @@ export default function PushNotificationManager({
                     type="checkbox"
                     checked={prefs.councilTasks}
                     onChange={() => handleTogglePref('councilTasks')}
-                    className="w-5 h-5 accent-[#1B365D]"
+                    className="w-5 h-5 accent-[var(--brand-primary)]"
                   />
                 </label>
               </div>
@@ -337,7 +337,7 @@ export default function PushNotificationManager({
                 type="button"
                 onClick={handleSendTest}
                 disabled={isSendingTest}
-                className="w-full min-h-[44px] h-11 inline-flex items-center justify-center gap-2 border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] font-semibold rounded-lg transition-colors disabled:opacity-60"
+                className="w-full min-h-[44px] h-11 inline-flex items-center justify-center gap-2 border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] font-semibold rounded-lg transition-colors disabled:opacity-60"
               >
                 {isSendingTest ? (
                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

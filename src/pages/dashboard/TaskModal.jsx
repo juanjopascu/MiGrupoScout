@@ -148,7 +148,7 @@ export default function TaskModal({
 
           <button
             type="submit"
-            className="w-full h-12 bg-[#1B365D] hover:bg-[#122643] text-white font-semibold rounded-lg transition-colors"
+            className="w-full h-12 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-lg transition-colors"
           >
             {editingTask ? 'Guardar cambios' : 'Crear tarea'}
           </button>

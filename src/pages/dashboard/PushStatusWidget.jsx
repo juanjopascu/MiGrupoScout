@@ -41,7 +41,7 @@ export default function PushStatusWidget({ pushState, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full min-h-[56px] p-3.5 rounded-xl bg-white border border-slate-300 hover:border-[#1B365D] shadow-sm flex items-center justify-between gap-3 text-left transition-colors"
+      className="w-full min-h-[56px] p-3.5 rounded-xl bg-white border border-slate-300 hover:border-[var(--brand-primary)] shadow-sm flex items-center justify-between gap-3 text-left transition-colors"
     >
       <div className="flex items-center gap-3 min-w-0">
         <span

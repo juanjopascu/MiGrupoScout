@@ -78,7 +78,7 @@ export default function CampStepThree({
                   <button
                     type="button"
                     onClick={onOpenDocGenerator}
-                    className="h-11 px-4 rounded-lg border border-[#1B365D] bg-[#EBF2FA] text-[#1B365D] hover:bg-blue-100 text-sm font-semibold inline-flex items-center gap-2"
+                    className="h-11 px-4 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] hover:bg-blue-100 text-sm font-semibold inline-flex items-center gap-2"
                   >
                     <FileText className="w-4 h-4" aria-hidden="true" />
                     <span>Generar Nota</span>
@@ -91,10 +91,10 @@ export default function CampStepThree({
       </div>
 
       {/* Fecha Limite y Alertas Push */}
-      <div className="p-4 rounded-xl border border-[#1B365D] bg-[#EBF2FA]/60 space-y-3">
+      <div className="p-4 rounded-xl border border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] space-y-3">
         <div className="flex items-start gap-3">
           <CalendarClock
-            className="w-5 h-5 text-[#1B365D] shrink-0 mt-0.5"
+            className="w-5 h-5 text-[var(--brand-primary)] shrink-0 mt-0.5"
             aria-hidden="true"
           />
           <div>
@@ -119,7 +119,7 @@ export default function CampStepThree({
               className="min-h-[44px] flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-slate-300 bg-white cursor-pointer"
             >
               <span className="text-sm font-medium text-slate-900 inline-flex items-center gap-2">
-                <BellPlus className="w-4 h-4 text-[#1B365D]" aria-hidden="true" />
+                <BellPlus className="w-4 h-4 text-[var(--brand-primary)]" aria-hidden="true" />
                 <span>{rem.label}</span>
               </span>
               <input
@@ -134,7 +134,7 @@ export default function CampStepThree({
                     }
                   }))
                 }
-                className="w-5 h-5 accent-[#1B365D]"
+                className="w-5 h-5 accent-[var(--brand-primary)]"
               />
             </label>
           ))}
@@ -148,7 +148,7 @@ export default function CampStepThree({
             <button
               type="button"
               onClick={onOpenPushManager}
-              className="h-11 px-3.5 rounded-lg bg-[#1B365D] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shrink-0"
+              className="h-11 px-3.5 rounded-lg bg-[var(--brand-primary)] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shrink-0"
             >
               <BellRing className="w-4 h-4" aria-hidden="true" />
               <span>Activar alertas Push</span>
@@ -179,7 +179,7 @@ export default function CampStepThree({
         <button
           type="button"
           onClick={() => void onSave()}
-          className="h-12 flex-1 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white font-semibold inline-flex items-center justify-center gap-2"
+          className="h-12 flex-1 px-4 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold inline-flex items-center justify-center gap-2"
         >
           <Save className="w-4 h-4" aria-hidden="true" />
           <span>Guardar planificacion</span>
@@ -187,7 +187,7 @@ export default function CampStepThree({
         <button
           type="button"
           onClick={onOpenDocGenerator}
-          className="h-12 flex-1 px-4 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] font-semibold inline-flex items-center justify-center gap-2"
+          className="h-12 flex-1 px-4 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] font-semibold inline-flex items-center justify-center gap-2"
         >
           <FileText className="w-4 h-4" aria-hidden="true" />
           <span>Generar Pedido de Acampe</span>

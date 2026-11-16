@@ -214,7 +214,7 @@ export default function MemberListPanel({
             <button
               type="button"
               onClick={() => setVisibleLimit((prev) => prev + PAGE_SIZE)}
-              className="w-full h-11 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-[#1B365D] inline-flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-[var(--brand-primary)] inline-flex items-center justify-center gap-2"
             >
               <ChevronDown className="w-4 h-4" aria-hidden="true" />
               <span>

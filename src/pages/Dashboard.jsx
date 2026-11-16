@@ -96,9 +96,9 @@ export default function Dashboard({
               <span
                 className="px-2.5 py-0.5 rounded-full text-xs font-semibold border"
                 style={{
-                  backgroundColor: 'var(--brand-primary-soft, #EBF2FA)',
-                  borderColor: 'var(--brand-primary, #1B365D)',
-                  color: 'var(--brand-primary-soft-text, #1B365D)'
+                  backgroundColor: 'var(--brand-primary-soft, #F3ECF9)',
+                  borderColor: 'var(--brand-primary, #4D207A)',
+                  color: 'var(--brand-primary-soft-text, #4D207A)'
                 }}
               >
                 {isDemoMode ? 'Demo Local' : getRoleLabel(userRole)}
@@ -125,7 +125,7 @@ export default function Dashboard({
       </div>
 
       {!hasActiveGroup && (
-        <div className="p-4 rounded-xl border border-[#1B365D] bg-[#EBF2FA] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="p-4 rounded-xl border border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="text-sm text-slate-900">
             <p className="font-semibold">Todavia no vinculaste tu cuenta a un Grupo Scout</p>
             <p className="text-xs text-slate-700">
@@ -135,7 +135,7 @@ export default function Dashboard({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="h-10 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-xs sm:text-sm font-semibold shrink-0"
+            className="h-10 px-4 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-xs sm:text-sm font-semibold shrink-0"
           >
             Configurar o aceptar invitacion
           </button>
@@ -176,7 +176,7 @@ export default function Dashboard({
               onClick={() => setActiveSegment('tasks')}
               className={`min-h-[44px] px-3 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors ${
                 activeSegment === 'tasks'
-                  ? 'bg-[#1B365D] text-white'
+                  ? 'bg-[var(--brand-primary)] text-white'
                   : 'text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -190,7 +190,7 @@ export default function Dashboard({
               onClick={() => setActiveSegment('members')}
               className={`min-h-[44px] px-3 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors ${
                 activeSegment === 'members'
-                  ? 'bg-[#1B365D] text-white'
+                  ? 'bg-[var(--brand-primary)] text-white'
                   : 'text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -203,7 +203,7 @@ export default function Dashboard({
             <button
               type="button"
               onClick={openNewTaskModal}
-              className="h-11 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+              className="h-11 px-4 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" aria-hidden="true" />
               <span>Nueva tarea</span>
@@ -224,7 +224,7 @@ export default function Dashboard({
                 <button
                   type="button"
                   onClick={() => setCsvModalOpen(true)}
-                  className="h-11 px-3.5 rounded-lg border border-[#1B365D] text-[#1B365D] hover:bg-[#EBF2FA] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                  className="h-11 px-3.5 rounded-lg border border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
                 >
                   <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
                   <span>Importar CSV</span>
@@ -233,7 +233,7 @@ export default function Dashboard({
               <button
                 type="button"
                 onClick={openNewMemberModal}
-                className="h-11 px-4 rounded-lg bg-[#1B365D] hover:bg-[#122643] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                className="h-11 px-4 rounded-lg bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
               >
                 <Plus className="w-4 h-4" aria-hidden="true" />
                 <span>Agregar miembro</span>
@@ -256,7 +256,7 @@ export default function Dashboard({
                 onClick={() => setBranchFilter(branch.id)}
                 className={`min-h-[44px] px-4 rounded-full text-sm font-semibold whitespace-nowrap border transition-colors shrink-0 ${
                   active
-                    ? 'bg-[#1B365D] border-[#1B365D] text-white'
+                    ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white'
                     : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
                 }`}
               >

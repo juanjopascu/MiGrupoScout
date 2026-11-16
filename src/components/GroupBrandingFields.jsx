@@ -58,7 +58,7 @@ export default function GroupBrandingFields({
             className="text-xs font-semibold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
           >
             <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Colores SAAC</span>
+            <span>Violeta Scout</span>
           </button>
         ) : (
           <span className="text-xs font-medium text-slate-600">

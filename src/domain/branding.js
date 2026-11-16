@@ -4,12 +4,18 @@
  */
 
 export const DEFAULT_BRANDING = Object.freeze({
-  primaryColor: '#1B365D',
-  accentColor: '#2E7D32',
+  primaryColor: '#4D207A',
+  accentColor: '#7C3AED',
   logoUrl: null
 });
 
 export const BRAND_COLOR_PRESETS = Object.freeze([
+  Object.freeze({
+    id: 'wosm',
+    label: 'Violeta Scout Internacional',
+    primary: '#4D207A',
+    accent: '#7C3AED'
+  }),
   Object.freeze({
     id: 'saac',
     label: 'Azul SAAC',
@@ -26,19 +32,13 @@ export const BRAND_COLOR_PRESETS = Object.freeze([
     id: 'rover',
     label: 'Bordo Rover',
     primary: '#7F1D1D',
-    accent: '#1B365D'
+    accent: '#4D207A'
   }),
   Object.freeze({
     id: 'caminante',
     label: 'Azul Noche',
     primary: '#0F172A',
     accent: '#0284C7'
-  }),
-  Object.freeze({
-    id: 'terracota',
-    label: 'Terracota',
-    primary: '#9A3412',
-    accent: '#15803D'
   }),
   Object.freeze({
     id: 'teal',
