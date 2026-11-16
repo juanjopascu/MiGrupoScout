@@ -36,6 +36,28 @@ export default function AuthScreen({
         </div>
 
         <div className="bg-white border border-slate-300 rounded-2xl shadow-sm p-5 sm:p-6 space-y-5">
+          {session && isPlatformAdmin && onOpenPlatformAdmin && (
+            <div className="rounded-xl border border-slate-900 bg-slate-900 text-white p-4 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="text-xs leading-relaxed">
+                  <p className="font-bold text-sm">Acceso de Administrador Global activo</p>
+                  <p className="text-slate-200 mt-0.5">
+                    No necesitas crear un Grupo Scout propio: podes supervisar todos los Grupos y entrar directamente al que necesites administrar.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenPlatformAdmin}
+                className="w-full h-10 rounded-lg bg-white text-slate-900 hover:bg-slate-100 text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                <span>Abrir Panel Admin Global</span>
+              </button>
+            </div>
+          )}
+
           <AuthTenantPanel
             session={session}
             pendingInviteCode={pendingInviteCode}
@@ -45,17 +67,6 @@ export default function AuthScreen({
           />
 
           <div className="pt-4 border-t border-slate-200 space-y-2.5">
-            {session && isPlatformAdmin && onOpenPlatformAdmin && (
-              <button
-                type="button"
-                onClick={onOpenPlatformAdmin}
-                className="w-full h-11 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
-              >
-                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-                <span>Admin Global (ver y gestionar todos los Grupos)</span>
-              </button>
-            )}
-
             {!session ? (
               <button
                 type="button"

@@ -503,7 +503,7 @@ export async function resolveUserActiveGroup(session, preferredGroupId = null) {
   const targetGroupId = preferredGroupId || readLocalPref(LS_KEYS.ACTIVE_GROUP_ID, null);
 
   if (!isSupabaseConfigured || !supabase || session?.isLocal) {
-    const isPlatformAdmin = isLocalPlatformAdmin(session.user.id);
+    const isPlatformAdmin = isLocalPlatformAdmin(session.user.id, session.user.email);
     const localItems = listLocalUserMemberships(session.user.id);
 
     if (isPlatformAdmin && targetGroupId && !localItems.some((m) => m.group_id === targetGroupId)) {

@@ -329,10 +329,10 @@ export async function deleteScoutGroupTenant({ groupId, confirmNumber }) {
   };
 }
 
-export async function checkIsPlatformAdmin(userId) {
-  if (!userId) return false;
+export async function checkIsPlatformAdmin(userId, userEmail = null) {
+  if (!userId && !userEmail) return false;
   if (!isSupabaseConfigured || !supabase) {
-    return isLocalPlatformAdmin(userId);
+    return isLocalPlatformAdmin(userId, userEmail);
   }
 
   try {

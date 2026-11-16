@@ -163,7 +163,14 @@ export async function signUpLocalUser(email, password, fullName = '') {
   return { session, user: session.user, error: null };
 }
 
-export function isLocalPlatformAdmin(userId) {
+export function isLocalPlatformAdmin(userId, userEmail = null) {
+  const cleanEmail = sanitizeString(userEmail || '', { maxLength: 160 }).toLowerCase();
+  if (cleanEmail && cleanEmail === DEFAULT_PLATFORM_ADMIN_EMAIL) {
+    if (userId) {
+      setLocalPlatformAdmin(userId, true);
+    }
+    return true;
+  }
   if (!userId) return false;
   const admins = readStoreJson(LOCAL_STORE_KEYS.PLATFORM_ADMINS, []);
   return Array.isArray(admins) && admins.includes(userId);
@@ -510,27 +517,27 @@ export function acceptLocalInvitation(rawCode, displayName = '') {
 
   const nextMembership = existing
     ? {
-        ...existing,
-        role: finalRole,
-        branch: inv.branch,
-        is_active: true,
-        updated_at: nowIso
-      }
+      ...existing,
+      role: finalRole,
+      branch: inv.branch,
+      is_active: true,
+      updated_at: nowIso
+    }
     : {
-        id: createUuidV4(),
-        group_id: group.id,
-        user_id: session.user.id,
-        role: finalRole,
-        branch: inv.branch,
-        display_name:
-          sanitizeString(displayName, { maxLength: 100 }) ||
-          session.user.user_metadata?.full_name ||
-          session.user.email.split('@')[0],
-        member_email: session.user.email,
-        is_active: true,
-        created_at: nowIso,
-        updated_at: nowIso
-      };
+      id: createUuidV4(),
+      group_id: group.id,
+      user_id: session.user.id,
+      role: finalRole,
+      branch: inv.branch,
+      display_name:
+        sanitizeString(displayName, { maxLength: 100 }) ||
+        session.user.user_metadata?.full_name ||
+        session.user.email.split('@')[0],
+      member_email: session.user.email,
+      is_active: true,
+      created_at: nowIso,
+      updated_at: nowIso
+    };
 
   const nextMemberships = existing
     ? memberships.map((m) => (m.id === existing.id ? nextMembership : m))
@@ -743,26 +750,26 @@ export function adminAssignLocalTenantLeader({
 
   const nextMembership = existing
     ? {
-        ...existing,
-        role: nextRole,
-        branch: nextBranch,
-        display_name: existing.display_name || foundUser.fullName,
-        member_email: foundUser.email,
-        is_active: true,
-        updated_at: nowIso
-      }
+      ...existing,
+      role: nextRole,
+      branch: nextBranch,
+      display_name: existing.display_name || foundUser.fullName,
+      member_email: foundUser.email,
+      is_active: true,
+      updated_at: nowIso
+    }
     : {
-        id: createUuidV4(),
-        group_id: groupId,
-        user_id: foundUser.id,
-        role: nextRole,
-        branch: nextBranch,
-        display_name: foundUser.fullName,
-        member_email: foundUser.email,
-        is_active: true,
-        created_at: nowIso,
-        updated_at: nowIso
-      };
+      id: createUuidV4(),
+      group_id: groupId,
+      user_id: foundUser.id,
+      role: nextRole,
+      branch: nextBranch,
+      display_name: foundUser.fullName,
+      member_email: foundUser.email,
+      is_active: true,
+      created_at: nowIso,
+      updated_at: nowIso
+    };
 
   const nextMemberships = existing
     ? memberships.map((m) => (m.id === existing.id ? nextMembership : m))

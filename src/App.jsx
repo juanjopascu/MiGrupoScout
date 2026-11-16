@@ -160,6 +160,9 @@ export default function App() {
           } else {
             await seedDemoDataIfEmpty(true);
             setSettingsModalOpen(true);
+            if (nextIsPlatformAdmin) {
+              setPlatformAdminOpen(true);
+            }
           }
         } else {
           await seedDemoDataIfEmpty(false);
