@@ -3,7 +3,41 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+function pickPublicEnv(...keys) {
+  for (const key of keys) {
+    const val = process.env?.[key];
+    if (typeof val === 'string' && val.trim()) {
+      return val.trim();
+    }
+  }
+  return '';
+}
+
+const resolvedSupabaseUrl = pickPublicEnv(
+  'VITE_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'SUPABASE_URL'
+);
+
+const resolvedSupabaseAnonKey = pickPublicEnv(
+  'VITE_SUPABASE_ANON_KEY',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+  'SUPABASE_ANON_KEY'
+);
+
+const resolvedVapidPublicKey = pickPublicEnv(
+  'VITE_VAPID_PUBLIC_KEY',
+  'VAPID_PUBLIC_KEY'
+);
+
 export default defineConfig({
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
+  define: {
+    __APP_SUPABASE_URL__: JSON.stringify(resolvedSupabaseUrl),
+    __APP_SUPABASE_ANON_KEY__: JSON.stringify(resolvedSupabaseAnonKey),
+    __APP_VAPID_PUBLIC_KEY__: JSON.stringify(resolvedVapidPublicKey)
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -11,7 +45,7 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.js',
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       injectRegister: false,
       includeAssets: ['offline.html', 'offline.js', 'icons/favicon.svg', 'icons/apple-touch-icon.png', 'icons/badge-72.png'],
       manifest: {
