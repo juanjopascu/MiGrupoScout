@@ -8,7 +8,8 @@ import { PlatformAdminModal } from './components/PlatformAdminModal.jsx';
 import PushNotificationManager from './components/PushNotificationManager.jsx';
 import TeamManagementModal from './components/TeamManagementModal.jsx';
 import { applyGroupBrandingToDocument } from './domain/branding.js';
-import { canDeleteRecords, normalizeInviteCode } from './domain/roles.js';
+import { canDeleteRecords, canManageAccounting, normalizeInviteCode } from './domain/roles.js';
+import AccountingLedger from './pages/AccountingLedger.jsx';
 import CampPlanner from './pages/CampPlanner.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DocGenerator from './pages/DocGenerator.jsx';
@@ -53,6 +54,7 @@ function resolveTabFromPath(pathname) {
   if (path.startsWith('/normativa')) return 'normativa';
   if (path.startsWith('/campamentos') || path.startsWith('/salidas')) return 'campamentos';
   if (path.startsWith('/documentos') || path.startsWith('/actas')) return 'documentos';
+  if (path.startsWith('/contabilidad') || path.startsWith('/caja')) return 'contabilidad';
   return 'dashboard';
 }
 
@@ -60,6 +62,7 @@ function pathForTab(tab) {
   if (tab === 'normativa') return '/normativa';
   if (tab === 'campamentos') return '/campamentos';
   if (tab === 'documentos') return '/documentos';
+  if (tab === 'contabilidad') return '/contabilidad';
   return '/dashboard';
 }
 
@@ -101,6 +104,7 @@ export default function App() {
   const [members, setMembers] = useState([]);
   const [camps, setCamps] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [ledgerEntries, setLedgerEntries] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   const [pushState, setPushState] = useState('checking');
@@ -121,16 +125,18 @@ export default function App() {
   });
 
   const loadGroupStateFromCache = useCallback(async (targetGroupId) => {
-    const [profile, cachedMembers, cachedCamps, cachedTasks] = await Promise.all([
+    const [profile, cachedMembers, cachedCamps, cachedTasks, cachedLedger] = await Promise.all([
       getGroupProfile(targetGroupId),
       getCachedCollection('group_members', targetGroupId),
       getCachedCollection('camp_checklists', targetGroupId),
-      getCachedCollection('council_tasks', targetGroupId)
+      getCachedCollection('council_tasks', targetGroupId),
+      getCachedCollection('group_ledger_entries', targetGroupId)
     ]);
     setGroupProfile(profile);
     setMembers(cachedMembers);
     setCamps(cachedCamps);
     setTasks(cachedTasks);
+    setLedgerEntries(cachedLedger);
   }, []);
 
   const bootstrap = useCallback(
@@ -190,6 +196,7 @@ export default function App() {
             setMembers(remote.members);
             setCamps(remote.camps);
             setTasks(remote.tasks);
+            setLedgerEntries(remote.ledgerEntries || []);
           }
         }
       } finally {
@@ -297,6 +304,25 @@ export default function App() {
       recordId: taskId
     });
     setTasks(list);
+  }
+
+  async function handleSaveLedgerEntry(entryPayload) {
+    const { list } = await saveEntityOfflineFirst({
+      table: 'group_ledger_entries',
+      groupId,
+      record: entryPayload,
+      isNewHint: !entryPayload.id
+    });
+    setLedgerEntries(list);
+  }
+
+  async function handleDeleteLedgerEntry(entryId) {
+    const list = await deleteEntityOfflineFirst({
+      table: 'group_ledger_entries',
+      groupId,
+      recordId: entryId
+    });
+    setLedgerEntries(list);
   }
 
   async function handleSaveMember(memberPayload) {
@@ -418,6 +444,7 @@ export default function App() {
     setManualOffline(false);
     setSyncFeedback(null);
     setMemberships([]);
+    setLedgerEntries([]);
     setIsPlatformAdmin(false);
     setViaPlatformAdmin(false);
     setPlatformAdminOpen(false);
@@ -485,6 +512,7 @@ export default function App() {
       setMembers(remote.members);
       setCamps(remote.camps);
       setTasks(remote.tasks);
+      setLedgerEntries(remote.ledgerEntries || []);
     }
 
     const applied = syncResult?.syncedCount || 0;
@@ -513,6 +541,9 @@ export default function App() {
 
   const effectiveIsOnline = isOnline && !manualOffline;
   const isDemoMode = !session || (!hasActiveGroup && !isPlatformAdmin);
+  const canViewAccounting = Boolean(
+    isPlatformAdmin || isDemoMode || canManageAccounting(userRole)
+  );
   const shouldShowAuthScreen =
     !isLoadingData && !demoBypass && (!session || (!hasActiveGroup && !isPlatformAdmin));
 
@@ -545,6 +576,7 @@ export default function App() {
         hasActiveGroup={hasActiveGroup}
         isPlatformAdmin={isPlatformAdmin}
         viaPlatformAdmin={viaPlatformAdmin}
+        canViewAccounting={canViewAccounting}
         isOnline={effectiveIsOnline}
         networkOnline={isOnline}
         manualOffline={manualOffline}
@@ -649,6 +681,28 @@ export default function App() {
                 preloadedCamp={preloadedDocCamp}
                 onClearPreloadedCamp={() => setPreloadedDocCamp(null)}
               />
+            )}
+
+            {activeTab === 'contabilidad' && canViewAccounting && (
+              <AccountingLedger
+                groupProfile={groupProfile}
+                entries={ledgerEntries}
+                canEdit={canViewAccounting}
+                canDelete={Boolean(isDemoMode || isPlatformAdmin || canDeleteRecords(userRole))}
+                onSaveEntry={handleSaveLedgerEntry}
+                onDeleteEntry={handleDeleteLedgerEntry}
+              />
+            )}
+
+            {activeTab === 'contabilidad' && !canViewAccounting && (
+              <div className="bg-white border border-slate-300 rounded-xl p-6 text-center space-y-2">
+                <p className="text-sm font-semibold text-slate-900">
+                  Modulo restringido a Jefatura de Grupo
+                </p>
+                <p className="text-xs text-slate-600">
+                  Solo el Jefe de Grupo y Subjefe de Grupo tienen acceso a Contabilidad, pagos y comprobantes.
+                </p>
+              </div>
             )}
           </>
         )}

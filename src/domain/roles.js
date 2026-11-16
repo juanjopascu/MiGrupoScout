@@ -61,6 +61,10 @@ export function canEditGroupSettings(role) {
   return role === 'jefe_grupo' || role === 'subjefe_grupo';
 }
 
+export function canManageAccounting(role) {
+  return role === 'jefe_grupo' || role === 'subjefe_grupo';
+}
+
 export function canEditGroupBranding(role) {
   return role === 'jefe_grupo';
 }

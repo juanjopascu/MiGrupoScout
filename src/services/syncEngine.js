@@ -120,6 +120,25 @@ function toDbPayload(table, record) {
       minutes_reference: record.minutes_reference || null
     };
   }
+  if (table === 'group_ledger_entries') {
+    return {
+      id: record.id,
+      group_id: record.group_id,
+      entry_type: record.entry_type || 'gasto',
+      category: record.category || 'general',
+      branch: record.branch || 'jefatura',
+      title: record.title,
+      description: record.description || null,
+      amount: Number(record.amount) || 0,
+      currency: record.currency || 'ARS',
+      entry_date: record.entry_date || new Date().toISOString().slice(0, 10),
+      payment_method: record.payment_method || 'efectivo',
+      receipt_number: record.receipt_number || null,
+      counterparty: record.counterparty || null,
+      status: record.status || 'confirmado',
+      receipt_url: record.receipt_url || null
+    };
+  }
   if (table === 'scout_groups') {
     return {
       id: record.id,
@@ -378,7 +397,7 @@ export async function pullRemoteSnapshot(groupId) {
     return null;
   }
 
-  const [groupRes, membersRes, campsRes, tasksRes] = await Promise.all([
+  const [groupRes, membersRes, campsRes, tasksRes, ledgerRes] = await Promise.all([
     supabase.from('scout_groups').select('*').eq('id', groupId).maybeSingle(),
     supabase
       .from('group_members')
@@ -394,7 +413,13 @@ export async function pullRemoteSnapshot(groupId) {
       .from('council_tasks')
       .select('*')
       .eq('group_id', groupId)
-      .order('due_date', { ascending: true })
+      .order('due_date', { ascending: true }),
+    supabase
+      .from('group_ledger_entries')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false })
   ]);
 
   if (groupRes.data) {
@@ -427,6 +452,9 @@ export async function pullRemoteSnapshot(groupId) {
   if (Array.isArray(tasksRes.data)) {
     await setCachedCollection('council_tasks', groupId, tasksRes.data);
   }
+  if (!ledgerRes.error && Array.isArray(ledgerRes.data)) {
+    await setCachedCollection('group_ledger_entries', groupId, ledgerRes.data);
+  }
 
   const syncedAt = new Date().toISOString();
   writeLocalPref(LS_KEYS.LAST_SYNC_AT, syncedAt);
@@ -436,7 +464,8 @@ export async function pullRemoteSnapshot(groupId) {
     groupProfile: await getGroupProfile(groupId),
     members: await getCachedCollection('group_members', groupId),
     camps: await getCachedCollection('camp_checklists', groupId),
-    tasks: await getCachedCollection('council_tasks', groupId)
+    tasks: await getCachedCollection('council_tasks', groupId),
+    ledgerEntries: await getCachedCollection('group_ledger_entries', groupId)
   };
 }
 

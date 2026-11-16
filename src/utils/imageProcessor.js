@@ -12,6 +12,8 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
 
 const MAX_INPUT_BYTES = 5 * 1024 * 1024;
 const TARGET_SIZE_PX = 192;
+const MAX_RECEIPT_INPUT_BYTES = 8 * 1024 * 1024;
+const MAX_RECEIPT_SIDE_PX = 1024;
 
 export async function processLogoImageFile(file) {
   if (!file) {
@@ -79,6 +81,79 @@ export async function processLogoImageFile(file) {
     return {
       ok: false,
       error: err?.message || 'No se pudo procesar la imagen del logo.'
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+export async function processReceiptImageFile(file) {
+  if (!file) {
+    return { ok: false, error: 'Selecciona la foto o captura del comprobante o ticket.' };
+  }
+
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
+    return {
+      ok: false,
+      error: 'Formato no permitido. Usa una imagen PNG, JPG o WebP.'
+    };
+  }
+
+  if (file.size > MAX_RECEIPT_INPUT_BYTES) {
+    return {
+      ok: false,
+      error: 'La imagen del comprobante supera el limite maximo de 8 MB.'
+    };
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('No se pudo decodificar la imagen del ticket.'));
+      image.src = objectUrl;
+    });
+
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    if (!width || !height) {
+      return { ok: false, error: 'La imagen del comprobante no tiene dimensiones validas.' };
+    }
+
+    const scale = Math.min(1, MAX_RECEIPT_SIDE_PX / Math.max(width, height));
+    const drawW = Math.max(1, Math.round(width * scale));
+    const drawH = Math.max(1, Math.round(height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = drawW;
+    canvas.height = drawH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return { ok: false, error: 'No se pudo inicializar el procesador de imagenes.' };
+    }
+
+    ctx.drawImage(img, 0, 0, drawW, drawH);
+
+    let dataUrl = canvas.toDataURL('image/webp', 0.8);
+    if (!dataUrl.startsWith('data:image/webp')) {
+      dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    }
+    if (dataUrl.length > 240000) {
+      dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+    }
+    if (dataUrl.length > 270000) {
+      return {
+        ok: false,
+        error: 'La imagen sigue siendo muy pesada; intenta recortar o tomar una foto con menor resolucion.'
+      };
+    }
+
+    return { ok: true, dataUrl };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || 'No se pudo procesar la imagen del comprobante.'
     };
   } finally {
     URL.revokeObjectURL(objectUrl);

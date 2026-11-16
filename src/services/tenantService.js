@@ -569,7 +569,7 @@ export async function exportGroupSnapshot(groupId, fallbackGroup = null) {
 
   if (shouldUseRemote) {
     try {
-      const [groupRes, teamRes, membersRes, campsRes, tasksRes] = await Promise.all([
+      const [groupRes, teamRes, membersRes, campsRes, tasksRes, ledgerRes] = await Promise.all([
         supabase.from('scout_groups').select('*').eq('id', groupId).maybeSingle(),
         supabase
           .from('group_memberships')
@@ -591,7 +591,12 @@ export async function exportGroupSnapshot(groupId, fallbackGroup = null) {
           .from('council_tasks')
           .select('*')
           .eq('group_id', groupId)
-          .order('due_date', { ascending: true })
+          .order('due_date', { ascending: true }),
+        supabase
+          .from('group_ledger_entries')
+          .select('*')
+          .eq('group_id', groupId)
+          .order('entry_date', { ascending: false })
       ]);
 
       const group = groupRes.data || fallbackGroup || (await getGroupProfile(groupId));
@@ -607,7 +612,8 @@ export async function exportGroupSnapshot(groupId, fallbackGroup = null) {
           team: Array.isArray(teamRes.data) ? teamRes.data : [],
           members: Array.isArray(membersRes.data) ? membersRes.data : [],
           camps: Array.isArray(campsRes.data) ? campsRes.data : [],
-          tasks: Array.isArray(tasksRes.data) ? tasksRes.data : []
+          tasks: Array.isArray(tasksRes.data) ? tasksRes.data : [],
+          ledgerEntries: !ledgerRes.error && Array.isArray(ledgerRes.data) ? ledgerRes.data : []
         }
       };
     } catch {
@@ -621,10 +627,11 @@ export async function exportGroupSnapshot(groupId, fallbackGroup = null) {
     return { ok: false, error: 'No se encontro la informacion local del Grupo Scout.' };
   }
 
-  const [members, camps, tasks] = await Promise.all([
+  const [members, camps, tasks, ledgerEntries] = await Promise.all([
     getCachedCollection('group_members', groupId),
     getCachedCollection('camp_checklists', groupId),
-    getCachedCollection('council_tasks', groupId)
+    getCachedCollection('council_tasks', groupId),
+    getCachedCollection('group_ledger_entries', groupId)
   ]);
 
   return {
@@ -635,7 +642,8 @@ export async function exportGroupSnapshot(groupId, fallbackGroup = null) {
       team: groupId === DEMO_GROUP_ID ? [] : listLocalGroupTeam(groupId),
       members: Array.isArray(members) ? members : [],
       camps: Array.isArray(camps) ? camps : [],
-      tasks: Array.isArray(tasks) ? tasks : []
+      tasks: Array.isArray(tasks) ? tasks : [],
+      ledgerEntries: Array.isArray(ledgerEntries) ? ledgerEntries : []
     }
   };
 }

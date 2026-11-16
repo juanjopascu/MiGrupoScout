@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Tent,
   Users,
+  Wallet,
   Wifi,
   WifiOff,
   X
@@ -45,6 +46,12 @@ export const NAV_ITEMS = Object.freeze([
     label: 'Actas y Notas',
     title: 'Generador de Notas',
     icon: FileText
+  }),
+  Object.freeze({
+    id: 'contabilidad',
+    label: 'Contabilidad',
+    title: 'Contabilidad, Comprobantes y Tickets',
+    icon: Wallet
   })
 ]);
 
@@ -76,6 +83,7 @@ export default function AppShell({
   hasActiveGroup = true,
   isPlatformAdmin = false,
   viaPlatformAdmin = false,
+  canViewAccounting = false,
   isOnline,
   networkOnline = true,
   manualOffline = false,
@@ -95,7 +103,10 @@ export default function AppShell({
   onDismissSwUpdate,
   children
 }) {
-  const activeNav = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => item.id !== 'contabilidad' || canViewAccounting
+  );
+  const activeNav = visibleNavItems.find((item) => item.id === activeTab) || visibleNavItems[0];
   const roleTag = isDemoMode
     ? 'Demo'
     : viaPlatformAdmin
@@ -133,7 +144,7 @@ export default function AppShell({
         </div>
 
         <nav className="flex-1 p-3 space-y-1.5" aria-label="Vistas principales">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.id === activeTab;
             return (
@@ -551,8 +562,12 @@ export default function AppShell({
         aria-label="Navegacion inferior"
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-300 pb-safe-bottom"
       >
-        <div className="h-16 grid grid-cols-4">
-          {NAV_ITEMS.map((item) => {
+        <div
+          className={`h-16 grid ${
+            visibleNavItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
+          }`}
+        >
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.id === activeTab;
             return (

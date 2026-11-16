@@ -374,7 +374,64 @@ export function buildDemoSeedData(groupId = DEMO_GROUP_ID) {
     }
   ];
 
-  return { groupProfile, members, camps, tasks };
+  const ledgerEntries = [
+    {
+      id: 'demo-ledger-01',
+      group_id: groupId,
+      entry_type: 'ingreso',
+      category: 'cuota_grupo',
+      branch: 'manada',
+      title: 'Cuotas mensuales Manada - Octubre',
+      description: 'Rendicion consolidada de 14 familias via transferencia.',
+      amount: 168000,
+      currency: 'ARS',
+      entry_date: relativeIsoDate(-6),
+      payment_method: 'transferencia',
+      receipt_number: 'TRF-2026-1041',
+      counterparty: 'Tesorería Manada',
+      status: 'confirmado',
+      receipt_url: null,
+      updated_at: nowIso
+    },
+    {
+      id: 'demo-ledger-02',
+      group_id: groupId,
+      entry_type: 'gasto',
+      category: 'alimentos_insumos',
+      branch: 'jefatura',
+      title: 'Ticket compra viveres Acampe de Primavera',
+      description: 'Supermercado mayorista: secos, frutas y bidones de agua.',
+      amount: 74500,
+      currency: 'ARS',
+      entry_date: relativeIsoDate(-3),
+      payment_method: 'mercado_pago',
+      receipt_number: 'FC-B-0004-00018291',
+      counterparty: 'Mayorista El Trebol',
+      status: 'rendido',
+      receipt_url: null,
+      updated_at: nowIso
+    },
+    {
+      id: 'demo-ledger-03',
+      group_id: groupId,
+      entry_type: 'gasto',
+      category: 'campamento_salida',
+      branch: 'unidad',
+      title: 'Sena reserva Campo Scout Punta Indio',
+      description: 'Comprobante de reserva de parcelas y quincho para 42 plazas.',
+      amount: 45000,
+      currency: 'ARS',
+      entry_date: relativeIsoDate(-1),
+      payment_method: 'transferencia',
+      receipt_number: 'COMP-99214',
+      counterparty: 'Campo Scout Punta Indio',
+      status: 'confirmado',
+      receipt_url: null,
+      updated_at: nowIso
+    }
+  ];
+
+  return { groupProfile, members, camps, tasks, ledgerEntries };
 }
 
 export function readLocalPref(key, fallback = null) {
@@ -435,7 +492,8 @@ export async function seedDemoDataIfEmpty(hasAuthSession = false) {
     setCacheItem(cacheKey('scout_group', DEMO_GROUP_ID), seed.groupProfile),
     setCacheItem(cacheKey('group_members', DEMO_GROUP_ID), seed.members),
     setCacheItem(cacheKey('camp_checklists', DEMO_GROUP_ID), seed.camps),
-    setCacheItem(cacheKey('council_tasks', DEMO_GROUP_ID), seed.tasks)
+    setCacheItem(cacheKey('council_tasks', DEMO_GROUP_ID), seed.tasks),
+    setCacheItem(cacheKey('group_ledger_entries', DEMO_GROUP_ID), seed.ledgerEntries)
   ]);
   writeLocalPref(LS_KEYS.ACTIVE_GROUP_ID, DEMO_GROUP_ID);
   writeLocalPref(LS_KEYS.DEMO_INITIALIZED, true);
@@ -579,7 +637,8 @@ export async function clearGroupOfflineData(groupId) {
       db.delete(STORE_KV_CACHE, cacheKey('scout_group', groupId)),
       db.delete(STORE_KV_CACHE, cacheKey('group_members', groupId)),
       db.delete(STORE_KV_CACHE, cacheKey('camp_checklists', groupId)),
-      db.delete(STORE_KV_CACHE, cacheKey('council_tasks', groupId))
+      db.delete(STORE_KV_CACHE, cacheKey('council_tasks', groupId)),
+      db.delete(STORE_KV_CACHE, cacheKey('group_ledger_entries', groupId))
     ]);
 
     const queue = await getOutboxQueue();

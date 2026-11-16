@@ -1,3 +1,9 @@
+import {
+  formatCurrencyAmount,
+  getLedgerCategoryLabel,
+  getLedgerStatusLabel,
+  getPaymentMethodLabel
+} from '../domain/accounting.js';
 import { getRoleLabel } from '../domain/roles.js';
 
 const FORMULA_PREFIX_REGEX = /^[\s\u00A0]*[=+\-@\t\r]/;
@@ -43,6 +49,7 @@ export function buildGroupCsvContent(exportData) {
   const members = Array.isArray(exportData?.members) ? exportData.members : [];
   const camps = Array.isArray(exportData?.camps) ? exportData.camps : [];
   const tasks = Array.isArray(exportData?.tasks) ? exportData.tasks : [];
+  const ledgerEntries = Array.isArray(exportData?.ledgerEntries) ? exportData.ledgerEntries : [];
 
   const rows = [
     [
@@ -114,6 +121,18 @@ export function buildGroupCsvContent(exportData) {
     ]);
   }
 
+  for (const item of ledgerEntries) {
+    rows.push([
+      'Contabilidad',
+      `${item.entry_type === 'ingreso' ? 'Ingreso' : 'Gasto'} - ${getLedgerCategoryLabel(item.category)}`,
+      item.branch || 'jefatura',
+      item.title || '',
+      `${item.counterparty || ''} ${item.receipt_number ? `(Nro: ${item.receipt_number})` : ''}`.trim(),
+      getLedgerStatusLabel(item.status),
+      `${item.entry_date || ''} | ${formatCurrencyAmount(item.amount, item.currency)} | ${getPaymentMethodLabel(item.payment_method)}`
+    ]);
+  }
+
   const csvBody = rows
     .map((row) => row.map((cell) => escapeCsvCell(cell)).join(','))
     .join('\r\n');
@@ -128,6 +147,7 @@ export function buildGroupJsonContent(exportData) {
   const members = Array.isArray(exportData?.members) ? exportData.members : [];
   const camps = Array.isArray(exportData?.camps) ? exportData.camps : [];
   const tasks = Array.isArray(exportData?.tasks) ? exportData.tasks : [];
+  const ledgerEntries = Array.isArray(exportData?.ledgerEntries) ? exportData.ledgerEntries : [];
 
   const sanitizedTeam = team.map((t) => ({
     role: t.role,
@@ -145,7 +165,8 @@ export function buildGroupJsonContent(exportData) {
       teamCount: sanitizedTeam.length,
       membersCount: members.length,
       campsCount: camps.length,
-      tasksCount: tasks.length
+      tasksCount: tasks.length,
+      ledgerEntriesCount: ledgerEntries.length
     },
     group: group
       ? {
@@ -162,10 +183,55 @@ export function buildGroupJsonContent(exportData) {
     team: sanitizedTeam,
     members,
     camps,
-    tasks
+    tasks,
+    ledgerEntries
   };
 
   return JSON.stringify(payload, null, 2);
+}
+
+export function buildLedgerCsvContent(entries = [], group = null) {
+  const list = Array.isArray(entries) ? entries : [];
+  const rows = [
+    [
+      'Grupo',
+      'Fecha',
+      'Tipo',
+      'Categoria',
+      'Rama',
+      'Concepto',
+      'Pagador / Proveedor',
+      'Medio de Pago',
+      'Nro. Ticket / Comprobante',
+      'Moneda',
+      'Monto',
+      'Estado',
+      'Comprobante Adjunto',
+      'Notas'
+    ]
+  ];
+
+  const groupLabel = group?.number ? `#${group.number} - ${group.name || ''}`.trim() : 'ConsejoScout';
+  for (const item of list) {
+    rows.push([
+      groupLabel,
+      item.entry_date || '',
+      item.entry_type === 'ingreso' ? 'Ingreso / Pago' : 'Gasto / Ticket',
+      getLedgerCategoryLabel(item.category),
+      item.branch || 'jefatura',
+      item.title || '',
+      item.counterparty || '',
+      getPaymentMethodLabel(item.payment_method),
+      item.receipt_number || '',
+      item.currency || 'ARS',
+      Number(item.amount || 0).toFixed(2),
+      getLedgerStatusLabel(item.status),
+      item.receipt_url ? 'Si' : 'No',
+      item.description || ''
+    ]);
+  }
+
+  return `\uFEFF${rows.map((r) => r.map((c) => escapeCsvCell(c)).join(',')).join('\r\n')}`;
 }
 
 export function triggerBrowserDownload(content, filename, mimeType) {

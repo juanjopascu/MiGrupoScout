@@ -218,6 +218,57 @@ CREATE TABLE IF NOT EXISTS council_tasks (
 CREATE INDEX IF NOT EXISTS idx_council_tasks_group_status_due
   ON council_tasks (group_id, status, due_date);
 
+CREATE TABLE IF NOT EXISTS group_ledger_entries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid NOT NULL REFERENCES scout_groups(id) ON DELETE CASCADE,
+  entry_type text NOT NULL CHECK (entry_type IN ('ingreso', 'gasto')),
+  category text NOT NULL DEFAULT 'general'
+    CHECK (category IN (
+      'cuota_grupo',
+      'campamento_salida',
+      'evento_recaudacion',
+      'donacion_subsidio',
+      'alimentos_insumos',
+      'materiales_rama',
+      'equipamiento_grupo',
+      'transporte_logistica',
+      'servicios_sede',
+      'cruz_del_sur_seguros',
+      'general'
+    )),
+  branch text NOT NULL DEFAULT 'jefatura'
+    CHECK (branch IN ('manada', 'unidad', 'caminantes', 'rovers', 'jefatura')),
+  title text NOT NULL,
+  description text,
+  amount numeric(12, 2) NOT NULL CHECK (amount > 0),
+  currency text NOT NULL DEFAULT 'ARS' CHECK (currency IN ('ARS', 'USD')),
+  entry_date date NOT NULL DEFAULT CURRENT_DATE,
+  payment_method text NOT NULL DEFAULT 'efectivo'
+    CHECK (payment_method IN ('efectivo', 'transferencia', 'mercado_pago', 'tarjeta', 'cheque', 'otro')),
+  receipt_number text,
+  counterparty text,
+  status text NOT NULL DEFAULT 'confirmado'
+    CHECK (status IN ('pendiente', 'confirmado', 'rendido', 'anulado')),
+  receipt_url text
+    CHECK (
+      receipt_url IS NULL
+      OR (
+        char_length(receipt_url) <= 280000
+        AND receipt_url !~* '(svg\+xml|<script|javascript:)'
+        AND (
+          receipt_url ~* '^data:image/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$'
+          OR receipt_url ~* '^https://'
+        )
+      )
+    ),
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_ledger_group_date
+  ON group_ledger_entries (group_id, entry_date DESC, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -465,6 +516,11 @@ CREATE TRIGGER trg_camp_checklists_validate_rules
 DROP TRIGGER IF EXISTS trg_council_tasks_updated_at ON council_tasks;
 CREATE TRIGGER trg_council_tasks_updated_at
   BEFORE UPDATE ON council_tasks
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_group_ledger_updated_at ON group_ledger_entries;
+CREATE TRIGGER trg_group_ledger_updated_at
+  BEFORE UPDATE ON group_ledger_entries
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 DROP TRIGGER IF EXISTS trg_push_subscriptions_updated_at ON push_subscriptions;
@@ -1631,6 +1687,42 @@ FROM auth.users
 WHERE lower(email) = 'juanjo.pascuzzi@gmail.com'
 ON CONFLICT (user_id) DO UPDATE SET
   email = EXCLUDED.email;
+
+-- 6.10 Politicas para group_ledger_entries (solo Jefatura de Grupo y Administrador Global)
+ALTER TABLE group_ledger_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_ledger_entries FORCE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE group_ledger_entries FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE group_ledger_entries TO authenticated;
+
+DROP POLICY IF EXISTS group_ledger_select ON group_ledger_entries;
+CREATE POLICY group_ledger_select
+  ON group_ledger_entries
+  FOR SELECT
+  TO authenticated
+  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+
+DROP POLICY IF EXISTS group_ledger_insert ON group_ledger_entries;
+CREATE POLICY group_ledger_insert
+  ON group_ledger_entries
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+
+DROP POLICY IF EXISTS group_ledger_update ON group_ledger_entries;
+CREATE POLICY group_ledger_update
+  ON group_ledger_entries
+  FOR UPDATE
+  TO authenticated
+  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']))
+  WITH CHECK (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
+
+DROP POLICY IF EXISTS group_ledger_delete ON group_ledger_entries;
+CREATE POLICY group_ledger_delete
+  ON group_ledger_entries
+  FOR DELETE
+  TO authenticated
+  USING (has_group_role(group_id, ARRAY['jefe_grupo', 'subjefe_grupo']));
 
 -- Recargar schema cache de PostgREST inmediatamente
 NOTIFY pgrst, 'reload schema';
